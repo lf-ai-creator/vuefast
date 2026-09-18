@@ -26,7 +26,7 @@ async def test_login_missing_params(async_client):
 @pytest.mark.anyio
 async def test_unauthorized_access(async_client):
     """未认证用户访问受保护接口应返回 HTTP 401。"""
-    response = await async_client.get("/api/v1/auth/users/me")
+    response = await async_client.get("/api/v1/users/me")
     assert response.status_code == 401
     data = response.json()
     assert data["code"] == "A0230"
@@ -44,7 +44,7 @@ async def test_health_check(async_client):
 @pytest.mark.anyio
 async def test_swagger_accessible(async_client):
     """OpenAPI 文档应可访问。"""
-    response = await async_client.get("/api/v1/swagger-ui.html")
+    response = await async_client.get("/docs")
     assert response.status_code == 200
 
 

@@ -1,22 +1,22 @@
 """主入口 — FastAPI 应用工厂，挂载路由、中间件、异常处理器。"""
 
 from contextlib import asynccontextmanager
-import uuid
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi_pagination import add_pagination
 from loguru import logger
+
+import app.registry  # noqa: F401  注册全部域模型，供 mapper 配置时解析跨域 relationship
 from app.config import settings
-from app.redis import close_redis
-from app.middleware import setup_cors, RequestLogMiddleware, IpRateLimitMiddleware
 from app.exceptions import (
     BusinessException,
     business_exception_handler,
     global_exception_handler,
     validation_exception_handler,
 )
-import app.registry  # noqa: F401  注册全部域模型，供 mapper 配置时解析跨域 relationship
+from app.middleware import IpRateLimitMiddleware, RequestLogMiddleware, setup_cors
+from app.redis import close_redis
 
 
 @asynccontextmanager
@@ -61,18 +61,18 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "youlai-fastapi"}
 
     # ── 注册路由 ──
-    from app.auth.router import router as auth_router
     from app.auth.qr_code import router as qr_code_router
-    from app.system.user.router import router as user_router
-    from app.system.role.router import router as role_router
-    from app.system.menu.router import router as menu_router
+    from app.auth.router import router as auth_router
+    from app.system.config.router import router as config_router
     from app.system.dept.router import router as dept_router
     from app.system.dict.router import router as dict_router
-    from app.system.config.router import router as config_router
-    from app.system.notice.router import router as notice_router
     from app.system.log.router import router as log_router
-    from app.tool.file.router import router as file_router
+    from app.system.menu.router import router as menu_router
+    from app.system.notice.router import router as notice_router
+    from app.system.role.router import router as role_router
+    from app.system.user.router import router as user_router
     from app.tool.codegen.router import router as codegen_router
+    from app.tool.file.router import router as file_router
     from app.tool.wxma.router import router as wxma_router
 
     app.include_router(auth_router)
@@ -91,6 +91,7 @@ def create_app() -> FastAPI:
 
     # ── SSE 端点 ──
     from app.tool.sse.router import router as sse_router
+
     app.include_router(sse_router)
 
     logger.info("All routers registered")

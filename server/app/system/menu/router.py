@@ -3,14 +3,14 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.schemas import SysUserDetails
 from app.database import get_db
 from app.dependencies import get_current_user, require_perm
-from app.auth.schemas import SysUserDetails
 from app.response import Result
-from app.system.menu.schemas import MenuCreate, MenuUpdate, MenuVisibleForm
-from app.system.menu.service import MenuService
-from app.system.log.operation_log import operation_log
 from app.system.log.constants import ActionTypeEnum, LogModuleEnum
+from app.system.log.operation_log import operation_log
+from app.system.menu.schemas import MenuCreate, MenuUpdate
+from app.system.menu.service import MenuService
 
 router = APIRouter(prefix="/api/v1/menus", tags=["菜单管理"])
 

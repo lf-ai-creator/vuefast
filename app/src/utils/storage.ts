@@ -3,12 +3,7 @@
  * 提供uni-app Storage操作方法
  */
 
-import {
-  ACCESS_TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
-  THEME_MODE_KEY,
-  THEME_COLOR_KEY,
-} from "@/constants";
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, THEME_MODE_KEY, THEME_COLOR_KEY } from "@/constants";
 
 /** 清理缓存时保留的键：登录态与主题偏好（清掉会导致下次启动退出登录、设置被重置） */
 const PRESERVED_KEYS = [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, THEME_MODE_KEY, THEME_COLOR_KEY];

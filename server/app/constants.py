@@ -6,7 +6,7 @@
 
 # ── 安全 ──
 ROLE_PREFIX = "ROLE_"
-ROOT_ROLE_CODE = "ADMIN"
+ROOT_ROLE_CODE = "ROOT"
 TOKEN_HEADER = "Authorization"
 TOKEN_PREFIX = "Bearer "
 
@@ -24,5 +24,5 @@ QR_CODE_PREFIX = "auth:qr_code:"
 QR_CODE_TTL = 300
 
 # ── 系统级全局 ──
-SUPER_ADMIN_ID = 1   # 内置超管账号 id
-ROOT_DEPT_ID = 1     # 根部门 id
+SUPER_ADMIN_ID = 1  # 内置超管账号 id
+ROOT_DEPT_ID = 1  # 根部门 id

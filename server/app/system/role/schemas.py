@@ -1,6 +1,6 @@
 """角色管理 Schemas。"""
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from app.serializers import BigId
 
@@ -45,6 +45,7 @@ class RoleMenuForm(BaseModel):
 
 class RolePageVO(BaseModel):
     """角色分页列表响应体。"""
+
     id: BigId | None = None
     name: str = ""
     code: str = ""
@@ -59,6 +60,7 @@ class RolePageVO(BaseModel):
 
 class RoleVO(RolePageVO):
     """角色详情视图对象，含菜单/部门关联 id。"""
+
     menuIds: list[BigId] = Field(default_factory=list)
     deptIds: list[BigId] = Field(default_factory=list)
 
@@ -69,6 +71,7 @@ class RoleForm(RoleUpdate):
 
 class RoleOptionVO(BaseModel):
     """角色下拉选项。"""
-    value: BigId = Field(..., alias="id")
-    label: str = Field(..., alias="name")
+
+    value: BigId = Field(..., validation_alias=AliasChoices("value", "id"))
+    label: str = Field(..., validation_alias=AliasChoices("label", "name"))
     model_config = {"from_attributes": True}

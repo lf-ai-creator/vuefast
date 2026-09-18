@@ -2,21 +2,25 @@
 
 from datetime import datetime
 
+from fastapi import HTTPException
+from loguru import logger
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from app.pagination import PageResult
-from app.system.user.constants import DEFAULT_PASSWORD
-from app.auth.utils import hash_password, verify_password
-from app.system.role.data_permission import apply_data_scope
 from app.auth.schemas import SysUserDetails
+from app.auth.token import get_token_manager
+from app.auth.utils import hash_password, verify_password
+from app.constants import ROOT_ROLE_CODE, SUPER_ADMIN_ID
 from app.exceptions import BusinessException
+from app.pagination import PageResult
 from app.response import ResultCode
 from app.system.dept.models import SysDept
+from app.system.role.data_permission import apply_data_scope
 from app.system.role.models import SysRole
+from app.system.user.constants import DEFAULT_PASSWORD
 from app.system.user.models import SysUser, SysUserRole
 from app.system.user.schemas import UserCreate, UserQuery, UserUpdate, UserVO
+from app.validation import parse_ids
 
 
 class UserService:
@@ -25,15 +29,49 @@ class UserService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def check_management(
+        self, actor: SysUserDetails, target_id: int | None = None, role_ids: list[int] | None = None
+    ) -> None:
+        """管理接口同时校验数据范围和超级管理员保护。"""
+        if ROOT_ROLE_CODE in actor.roles:
+            return
+        if target_id is not None:
+            if target_id == SUPER_ADMIN_ID:
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="不能管理超级管理员")
+            visible = await self.db.execute(
+                apply_data_scope(
+                    select(SysUser.id).where(SysUser.id == target_id, SysUser.is_deleted == 0),
+                    actor,
+                    SysUser.dept_id,
+                    SysUser.create_by,
+                )
+            )
+            if visible.scalar() is None:
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="目标用户不在可管理范围内")
+            protected = await self.db.execute(
+                select(SysRole.id)
+                .join(SysUserRole, SysUserRole.role_id == SysRole.id)
+                .where(SysUserRole.user_id == target_id, SysRole.code == ROOT_ROLE_CODE)
+            )
+            if protected.scalar() is not None:
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="不能管理超级管理员")
+        if role_ids:
+            protected = await self.db.execute(
+                select(SysRole.id).where(
+                    SysRole.id.in_(role_ids),
+                    SysRole.code == ROOT_ROLE_CODE,
+                )
+            )
+            if protected.scalar() is not None:
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="不能授予超级管理员角色")
+
     async def get_page(self, query: UserQuery, user: SysUserDetails | None = None) -> PageResult:
         """分页查询用户列表。传入 user 则按角色 data_scope 过滤。"""
         conditions = [SysUser.is_deleted == 0]
         if query.keywords:
             keyword = f"%{query.keywords}%"
             conditions.append(
-                (SysUser.username.ilike(keyword))
-                | (SysUser.nickname.ilike(keyword))
-                | (SysUser.mobile.ilike(keyword))
+                (SysUser.username.ilike(keyword)) | (SysUser.nickname.ilike(keyword)) | (SysUser.mobile.ilike(keyword))
             )
         if query.deptId is not None:
             conditions.append(SysUser.dept_id == query.deptId)
@@ -43,7 +81,9 @@ class UserService:
         # 数据权限：按 dept_id 与 create_by 过滤
         stmt = apply_data_scope(
             select(SysUser).where(*conditions),
-            user, SysUser.dept_id, SysUser.create_by,
+            user,
+            SysUser.dept_id,
+            SysUser.create_by,
         )
 
         # 总数（基于上面的子查询计数）
@@ -52,9 +92,7 @@ class UserService:
 
         # 分页数据
         offset = (query.pageNum - 1) * query.pageSize
-        rows = await self.db.execute(
-            stmt.order_by(SysUser.update_time.desc()).offset(offset).limit(query.pageSize)
-        )
+        rows = await self.db.execute(stmt.order_by(SysUser.update_time.desc()).offset(offset).limit(query.pageSize))
         users = rows.scalars().all()
 
         # 批量预加载 dept + roles（消除 N+1）
@@ -69,9 +107,7 @@ class UserService:
 
     async def get_by_id(self, user_id: int) -> UserVO:
         """根据 ID 获取用户详情。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -112,9 +148,7 @@ class UserService:
 
     async def update(self, form: UserUpdate, operator_id: int | None = None) -> UserVO:
         """更新用户，operator_id 写入 update_by。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == form.id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == form.id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -149,49 +183,49 @@ class UserService:
                 self.db.add(SysUserRole(user_id=form.id, role_id=rid))
             await self.db.flush()
 
+        await (await get_token_manager()).invalidate_user_sessions(form.id)
         logger.info(f"User updated: {form.username} id={form.id}")
         return await self._to_vo(user)
 
     async def delete(self, user_ids: str) -> int:
         """批量删除用户（逻辑删除）。"""
-        ids = [int(x) for x in user_ids.split(",") if x.strip()]
+        ids = parse_ids(user_ids)
         if not ids:
             raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="请选择要删除的用户")
-        result = await self.db.execute(
+        await self.db.execute(
             text("UPDATE sys_user SET is_deleted = 1 WHERE id = ANY(:ids)"),
             {"ids": ids},
         )
+        manager = await get_token_manager()
+        for user_id in ids:
+            await manager.invalidate_user_sessions(user_id)
         logger.info(f"Users deleted: {ids}")
         return len(ids)
 
     async def update_status(self, user_id: int, status: int) -> None:
         """修改用户状态。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
         user.status = status
         await self.db.flush()
+        await (await get_token_manager()).invalidate_user_sessions(user_id)
 
     async def reset_password(self, user_id: int, password: str) -> None:
         """重置用户密码。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
         user.password = hash_password(password)
         await self.db.flush()
+        await (await get_token_manager()).invalidate_user_sessions(user_id)
         logger.info(f"Password reset for user: {user_id}")
 
     async def get_user_form(self, user_id: int) -> UserUpdate:
         """获取用户表单数据。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -200,8 +234,7 @@ class UserService:
     async def get_user_options(self) -> list[dict]:
         """用户下拉选项。"""
         rows = await self.db.execute(
-            select(SysUser.id, SysUser.username, SysUser.nickname)
-            .where(SysUser.is_deleted == 0, SysUser.status == 1)
+            select(SysUser.id, SysUser.username, SysUser.nickname).where(SysUser.is_deleted == 0, SysUser.status == 1)
         )
         return [{"value": r.id, "label": f"{r.nickname}({r.username})"} for r in rows]
 
@@ -215,13 +248,13 @@ class UserService:
 
     async def update_user_profile(self, user_id: int, form) -> UserVO:
         """个人中心修改用户信息。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
         data = form.model_dump(exclude_unset=True)
+        if any(key in data and data[key] != getattr(user, key) for key in ("mobile", "email")):
+            raise HTTPException(status_code=501, detail="联系方式验证尚未接入，暂不支持更换")
         for k, v in data.items():
             setattr(user, k, v)
         await self.db.flush()
@@ -229,9 +262,7 @@ class UserService:
 
     async def change_password(self, user_id: int, old_password: str, new_password: str) -> None:
         """当前用户修改密码。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -239,24 +270,15 @@ class UserService:
             raise BusinessException(code=ResultCode.BAD_CREDENTIALS, msg="原密码错误")
         user.password = hash_password(new_password)
         await self.db.flush()
+        await (await get_token_manager()).invalidate_user_sessions(user_id)
 
     async def bind_or_change_mobile(self, user_id: int, mobile: str, code: str) -> None:
-        """绑定或更换手机号（验证码校验占位）。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
-        user = result.scalar_one_or_none()
-        if user is None:
-            raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
-        # TODO: 接入真实短信验证码校验
-        user.mobile = mobile
-        await self.db.flush()
+        """验证服务接入前拒绝未经验证的联系方式。"""
+        raise HTTPException(status_code=501, detail="短信验证尚未接入，暂不支持更换手机号")
 
     async def unbind_mobile(self, user_id: int, password: str) -> None:
         """解绑手机号。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -266,21 +288,12 @@ class UserService:
         await self.db.flush()
 
     async def bind_or_change_email(self, user_id: int, email: str, code: str) -> None:
-        """绑定或更换邮箱（验证码校验占位）。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
-        user = result.scalar_one_or_none()
-        if user is None:
-            raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
-        user.email = email
-        await self.db.flush()
+        """验证服务接入前拒绝未经验证的联系方式。"""
+        raise HTTPException(status_code=501, detail="邮件验证尚未接入，暂不支持更换邮箱")
 
     async def unbind_email(self, user_id: int, password: str) -> None:
         """解绑邮箱。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -295,10 +308,16 @@ class UserService:
             text("SELECT role_id FROM sys_user_role WHERE user_id = :uid"),
             {"uid": user.id},
         )
-        role_ids = [r for r, in role_rows]
+        role_ids = [r for (r,) in role_rows]
         return UserUpdate(
-            id=user.id, username=user.username, nickname=user.nickname, gender=user.gender,
-            deptId=user.dept_id, mobile=user.mobile, email=user.email, status=user.status,
+            id=user.id,
+            username=user.username,
+            nickname=user.nickname,
+            gender=user.gender,
+            deptId=user.dept_id,
+            mobile=user.mobile,
+            email=user.email,
+            status=user.status,
             roleIds=role_ids,
         )
 
@@ -308,9 +327,7 @@ class UserService:
         if query.keywords:
             keyword = f"%{query.keywords}%"
             conditions.append(
-                (SysUser.username.ilike(keyword))
-                | (SysUser.nickname.ilike(keyword))
-                | (SysUser.mobile.ilike(keyword))
+                (SysUser.username.ilike(keyword)) | (SysUser.nickname.ilike(keyword)) | (SysUser.mobile.ilike(keyword))
             )
         if query.deptId is not None:
             conditions.append(SysUser.dept_id == query.deptId)
@@ -320,7 +337,9 @@ class UserService:
         rows = await self.db.execute(
             apply_data_scope(
                 select(SysUser).where(*conditions).order_by(SysUser.id),
-                user, SysUser.dept_id, SysUser.create_by,
+                user,
+                SysUser.dept_id,
+                SysUser.create_by,
             )
         )
         users = rows.scalars().all()
@@ -347,22 +366,22 @@ class UserService:
                     errors.append(f"第{i}行: 用户名为空")
                     continue
                 exist = await self.db.execute(
-                    select(SysUser.id).where(
-                        SysUser.username == username, SysUser.is_deleted == 0
-                    )
+                    select(SysUser.id).where(SysUser.username == username, SysUser.is_deleted == 0)
                 )
                 if exist.scalar() is not None:
                     invalid += 1
                     errors.append(f"第{i}行: 用户名 {username} 已存在")
                     continue
-                self.db.add(SysUser(
-                    username=username,
-                    nickname=row.get("昵称", username),
-                    password=hash_password(DEFAULT_PASSWORD),
-                    mobile=row.get("手机号"),
-                    email=row.get("邮箱"),
-                    status=1 if row.get("状态") == "启用" else 0,
-                ))
+                self.db.add(
+                    SysUser(
+                        username=username,
+                        nickname=row.get("昵称", username),
+                        password=hash_password(DEFAULT_PASSWORD),
+                        mobile=row.get("手机号"),
+                        email=row.get("邮箱"),
+                        status=1 if row.get("状态") == "启用" else 0,
+                    )
+                )
                 valid += 1
             except Exception as e:
                 invalid += 1
@@ -381,9 +400,7 @@ class UserService:
         # 1) 批量查询部门名称
         dept_map: dict[int, str] = {}
         if dept_ids:
-            dept_rows = await self.db.execute(
-                select(SysDept.id, SysDept.name).where(SysDept.id.in_(dept_ids))
-            )
+            dept_rows = await self.db.execute(select(SysDept.id, SysDept.name).where(SysDept.id.in_(dept_ids)))
             dept_map = {row.id: row.name for row in dept_rows}
 
         # 2) 批量查询用户角色
@@ -403,22 +420,24 @@ class UserService:
         result = []
         for u in users:
             roles = role_map.get(u.id, [])
-            result.append(UserVO(
-                id=u.id,
-                username=u.username,
-                nickname=u.nickname,
-                gender=u.gender,
-                deptId=u.dept_id,
-                deptName=dept_map.get(u.dept_id) if u.dept_id else None,
-                mobile=u.mobile,
-                email=u.email,
-                avatar=u.avatar,
-                status=u.status,
-                roleIds=[r[0] for r in roles],
-                roleNames=[r[1] for r in roles],
-                createTime=str(u.create_time) if u.create_time else None,
-                updateTime=str(u.update_time) if u.update_time else None,
-            ))
+            result.append(
+                UserVO(
+                    id=u.id,
+                    username=u.username,
+                    nickname=u.nickname,
+                    gender=u.gender,
+                    deptId=u.dept_id,
+                    deptName=dept_map.get(u.dept_id) if u.dept_id else None,
+                    mobile=u.mobile,
+                    email=u.email,
+                    avatar=u.avatar,
+                    status=u.status,
+                    roleIds=[r[0] for r in roles],
+                    roleNames=[r[1] for r in roles],
+                    createTime=str(u.create_time) if u.create_time else None,
+                    updateTime=str(u.update_time) if u.update_time else None,
+                )
+            )
         return result
 
     async def _to_vo(self, user: SysUser) -> UserVO:

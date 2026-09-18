@@ -9,16 +9,20 @@ from app.auth.schemas import SysUserDetails
 from app.database import get_db
 from app.dependencies import get_current_user, require_perm
 from app.response import Result
+from app.system.dict.schemas import (
+    DictCreate,
+    DictItemCreate,
+    DictItemUpdate,
+    DictQuery,
+    DictUpdate,
+)
+from app.system.dict.service import DictService
 from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.operation_log import operation_log
 from app.tool.sse.manager import broadcast
 from app.tool.sse.topics import DICT
-from app.system.dict.schemas import (
-    DictCreate, DictItemCreate, DictItemUpdate, DictItemVO, DictUpdate, DictQuery,
-)
-from app.system.dict.service import DictService
 
-router = APIRouter(prefix="/api/v1/dicts", tags=["字典管理"])
+router = APIRouter(prefix="/api/v1/dicts", tags=["字典管理"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", summary="字典分页列表", dependencies=[Depends(require_perm("sys:dict:list"))])
@@ -29,6 +33,7 @@ async def get_dict_page(
     db: AsyncSession = Depends(get_db),
 ):
     from app.system.dict.schemas import DictQuery
+
     result = await DictService(db).get_type_page(DictQuery(pageNum=pageNum, pageSize=pageSize, keywords=keywords))
     return Result(data=result)
 
@@ -83,9 +88,7 @@ async def delete_dict(
 
 
 @router.get("/{dict_code}/items", summary="字典项列表")
-async def get_dict_items(
-    dict_code: str, query: DictQuery = Depends(), db: AsyncSession = Depends(get_db)
-):
+async def get_dict_items(dict_code: str, query: DictQuery = Depends(), db: AsyncSession = Depends(get_db)):
     return Result(data=await DictService(db).get_item_page(dict_code, query))
 
 
@@ -114,7 +117,9 @@ async def create_dict_item(
     return Result(data=result)
 
 
-@router.put("/{dict_code}/items/{item_id}", summary="更新字典项", dependencies=[Depends(require_perm("sys:dict-item:update"))])
+@router.put(
+    "/{dict_code}/items/{item_id}", summary="更新字典项", dependencies=[Depends(require_perm("sys:dict-item:update"))]
+)
 async def update_dict_item(dict_code: str, item_id: int, form: DictItemUpdate, db: AsyncSession = Depends(get_db)):
     form.id = item_id
     form.dictCode = dict_code
@@ -123,7 +128,9 @@ async def update_dict_item(dict_code: str, item_id: int, form: DictItemUpdate, d
     return Result(data=None)
 
 
-@router.delete("/{dict_code}/items/{item_ids}", summary="删除字典项", dependencies=[Depends(require_perm("sys:dict-item:delete"))])
+@router.delete(
+    "/{dict_code}/items/{item_ids}", summary="删除字典项", dependencies=[Depends(require_perm("sys:dict-item:delete"))]
+)
 @operation_log(module=LogModuleEnum.DICT, action_type=ActionTypeEnum.DELETE, title="删除字典项")
 async def delete_dict_items(
     request: Request,

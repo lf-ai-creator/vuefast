@@ -2,14 +2,15 @@
 
 from datetime import datetime
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
 from app.exceptions import BusinessException
 from app.response import ResultCode
 from app.system.dept.models import SysDept
 from app.system.dept.schemas import DeptCreate, DeptUpdate, DeptVO
+from app.validation import parse_ids
 
 
 class DeptService:
@@ -26,18 +27,14 @@ class DeptService:
         if status is not None:
             conditions.append(SysDept.status == status)
 
-        rows = await self.db.execute(
-            select(SysDept).where(*conditions).order_by(SysDept.sort.asc())
-        )
+        rows = await self.db.execute(select(SysDept).where(*conditions).order_by(SysDept.sort.asc()))
         depts = rows.scalars().all()
         vo_list = [self._to_vo(d) for d in depts]
         return self._build_tree(vo_list)
 
     async def get_by_id(self, dept_id: int) -> DeptVO:
         """根据 id 获取部门详情。"""
-        result = await self.db.execute(
-            select(SysDept).where(SysDept.id == dept_id, SysDept.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysDept).where(SysDept.id == dept_id, SysDept.is_deleted == 0))
         dept = result.scalar_one_or_none()
         if dept is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="部门不存在")
@@ -83,22 +80,25 @@ class DeptService:
         return DeptUpdate.model_validate(dept, from_attributes=True)
 
     async def create(self, form: DeptCreate) -> DeptVO:
-        exist = await self.db.execute(
-            select(SysDept.id).where(SysDept.code == form.code, SysDept.is_deleted == 0)
-        )
+        exist = await self.db.execute(select(SysDept.id).where(SysDept.code == form.code))
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="部门编号已存在")
 
+        parent = await self._validate_parent(form.parentId)
         dept = SysDept(
-            name=form.name, code=form.code, parent_id=form.parentId, sort=form.sort, status=form.status,
-            tree_path="0", create_time=datetime.now(),
+            name=form.name,
+            code=form.code,
+            parent_id=form.parentId,
+            sort=form.sort,
+            status=form.status,
+            tree_path="0",
+            create_time=datetime.now(),
         )
         self.db.add(dept)
         await self.db.flush()
 
         if dept.parent_id > 0:
-            parent = await self.db.get(SysDept, dept.parent_id)
-            dept.tree_path = f"{parent.tree_path},{dept.id}" if parent else str(dept.id)
+            dept.tree_path = f"{parent.tree_path},{parent.id}"
         else:
             dept.tree_path = "0"
         await self.db.flush()
@@ -108,19 +108,16 @@ class DeptService:
 
     async def update(self, form: DeptUpdate) -> DeptVO:
         """更新部门（编号重复返回 B0002）；parent_id 变动时重算 tree_path 并级联子节点。"""
-        result = await self.db.execute(
-            select(SysDept).where(SysDept.id == form.id, SysDept.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysDept).where(SysDept.id == form.id, SysDept.is_deleted == 0))
         dept = result.scalar_one_or_none()
         if dept is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="部门不存在")
 
-        exist = await self.db.execute(
-            select(SysDept.id).where(SysDept.code == form.code, SysDept.is_deleted == 0, SysDept.id != form.id)
-        )
+        exist = await self.db.execute(select(SysDept.id).where(SysDept.code == form.code, SysDept.id != form.id))
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="部门编号已存在")
 
+        parent = await self._validate_parent(form.parentId, dept.id)
         old_parent_id = dept.parent_id
         dept.name = form.name
         dept.code = form.code
@@ -131,8 +128,7 @@ class DeptService:
 
         if old_parent_id != dept.parent_id:
             if dept.parent_id > 0:
-                parent = await self.db.get(SysDept, dept.parent_id)
-                dept.tree_path = f"{parent.tree_path},{dept.id}" if parent and parent.tree_path else str(dept.id)
+                dept.tree_path = f"{parent.tree_path},{parent.id}"
             else:
                 dept.tree_path = "0"
             await self.db.flush()
@@ -143,19 +139,36 @@ class DeptService:
         logger.info(f"Dept updated: {form.name}")
         return self._to_vo(dept)
 
+    async def _validate_parent(self, parent_id: int, dept_id: int | None = None) -> SysDept | None:
+        """拒绝无效父级、自身及后代，防止部门树形成循环。"""
+        if parent_id < 0:
+            raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="父部门ID无效")
+        parent = None
+        seen = {dept_id} if dept_id is not None else set()
+        current_id = parent_id
+        while current_id:
+            if current_id in seen:
+                raise BusinessException(code=ResultCode.OPERATE_DENIED, msg="父部门不能是自身或下级部门")
+            seen.add(current_id)
+            current = await self.db.get(SysDept, current_id)
+            if current is None or current.is_deleted:
+                raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="父部门不存在")
+            if parent is None:
+                parent = current
+            current_id = current.parent_id
+        return parent
+
     async def _update_child_tree_paths(self, parent: SysDept) -> None:
         """递归更新子部门的 tree_path。"""
-        children = await self.db.execute(
-            select(SysDept).where(SysDept.parent_id == parent.id, SysDept.is_deleted == 0)
-        )
+        children = await self.db.execute(select(SysDept).where(SysDept.parent_id == parent.id, SysDept.is_deleted == 0))
         for child in children.scalars().all():
-            child.tree_path = f"{parent.tree_path},{child.id}" if parent.tree_path else str(child.id)
+            child.tree_path = f"{parent.tree_path},{parent.id}"
             await self.db.flush()
             await self._update_child_tree_paths(child)
 
     async def delete(self, ids: str) -> int:
         """批量逻辑删除部门；存在子部门的部门拒绝删除（返回 B0004）。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        id_list = parse_ids(ids)
         if not id_list:
             raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="请选择要删除的部门")
         for did in id_list:
@@ -175,8 +188,13 @@ class DeptService:
     def _to_vo(d: SysDept) -> DeptVO:
         """ORM 对象转视图对象（DeptVO）。"""
         return DeptVO(
-            id=d.id, name=d.name, code=d.code, parentId=d.parent_id,
-            treePath=d.tree_path, sort=d.sort, status=d.status,
+            id=d.id,
+            name=d.name,
+            code=d.code,
+            parentId=d.parent_id,
+            treePath=d.tree_path,
+            sort=d.sort,
+            status=d.status,
             createTime=str(d.create_time) if d.create_time else None,
         )
 

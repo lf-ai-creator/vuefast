@@ -4,16 +4,17 @@ import asyncio
 import io
 import uuid
 from datetime import datetime
+from urllib.parse import unquote, urlsplit
 
 import boto3
 from botocore.client import Config
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, File, UploadFile
 from loguru import logger
 from pydantic import BaseModel
 
+from app.auth.schemas import SysUserDetails
 from app.config import settings
 from app.dependencies import get_current_user
-from app.auth.schemas import SysUserDetails
 from app.exceptions import BusinessException
 from app.response import Result, ResultCode
 
@@ -68,8 +69,7 @@ async def _ensure_bucket(client, bucket: str) -> None:
             policy = (
                 '{"Version":"2012-10-17","Statement":['
                 '{"Effect":"Allow","Principal":{"AWS":["*"]},'
-                '"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::%s/*"]}]}'
-                % bucket
+                '"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::%s/*"]}]}' % bucket
             )
             client.put_bucket_policy(Bucket=bucket, Policy=policy)
 
@@ -94,7 +94,7 @@ async def upload_file(
     bucket = settings.S3_BUCKET
     await _ensure_bucket(client, bucket)
 
-    object_name = f"{datetime.now().strftime('%Y%m%d')}/{uuid.uuid4().hex}.{ext}"
+    object_name = f"{datetime.now().strftime('%Y%m%d')}/{user.userId}/{uuid.uuid4().hex}.{ext}"
     loop = asyncio.get_running_loop()
 
     def _sync_upload():
@@ -116,11 +116,10 @@ async def upload_file(
 @router.delete("", summary="删除文件")
 async def delete_file(filePath: str, user: SysUserDetails = Depends(get_current_user)):
     """从 S3（RustFS）删除文件。"""
+    object_name = _object_name_for_delete(filePath, user)
     client = _get_s3_client()
     bucket = settings.S3_BUCKET
 
-    # 从 URL 提取 object_name
-    object_name = filePath.split(f"/{bucket}/")[-1]
     loop = asyncio.get_running_loop()
 
     def _sync_delete():
@@ -129,3 +128,20 @@ async def delete_file(filePath: str, user: SysUserDetails = Depends(get_current_
     await loop.run_in_executor(None, _sync_delete)
     logger.info(f"File deleted: {object_name} by user={user.userId}")
     return Result(data=None)
+
+
+def _object_name_for_delete(file_path: str, user: SysUserDetails) -> str:
+    """仅允许本服务桶中的对象；普通用户只能删除自己上传的文件。"""
+    url = urlsplit(file_path)
+    expected = urlsplit(f"{'https' if settings.S3_SECURE else 'http'}://{settings.S3_ENDPOINT}")
+    prefix = f"/{settings.S3_BUCKET}/"
+    path = unquote(url.path)
+    if url.scheme != expected.scheme or url.netloc != expected.netloc or not path.startswith(prefix):
+        raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="文件地址不属于当前存储服务")
+    object_name = path[len(prefix) :]
+    parts = object_name.split("/")
+    if not object_name or any(part in {"", ".", ".."} or "\\" in part for part in parts):
+        raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="文件地址无效")
+    if not user.roles.intersection({"ROOT", "ADMIN"}) and (len(parts) != 3 or parts[1] != str(user.userId)):
+        raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="只能删除自己上传的文件")
+    return object_name

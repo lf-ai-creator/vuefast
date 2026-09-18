@@ -2,7 +2,6 @@
 
 from typing import TypeVar
 
-from fastapi import Query
 from fastapi_pagination import Page as FastAPIPage
 from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from pydantic import BaseModel, Field

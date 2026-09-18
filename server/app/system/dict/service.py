@@ -2,16 +2,22 @@
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from app.pagination import PageResult
 from app.exceptions import BusinessException
+from app.pagination import PageResult
 from app.response import ResultCode
 from app.system.dict.models import SysDict, SysDictItem
 from app.system.dict.schemas import (
-    DictCreate, DictItemCreate, DictItemUpdate, DictItemVO,
-    DictQuery, DictUpdate, DictVO, DictItemOptionVO,
+    DictCreate,
+    DictItemCreate,
+    DictItemOptionVO,
+    DictItemUpdate,
+    DictItemVO,
+    DictQuery,
+    DictUpdate,
+    DictVO,
 )
+from app.validation import parse_ids
 
 
 class DictService:
@@ -54,11 +60,14 @@ class DictService:
 
     async def create_type(self, form: DictCreate) -> DictVO:
         """创建字典类型；dict_code 重复时返回 B0002。"""
-        exist = await self.db.execute(select(SysDict.id).where(SysDict.dict_code == form.dictCode, SysDict.is_deleted == 0))
+        exist = await self.db.execute(
+            select(SysDict.id).where(SysDict.dict_code == form.dictCode, SysDict.is_deleted == 0)
+        )
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="字典编码已存在")
         obj = SysDict(dict_code=form.dictCode, name=form.name, status=form.status, remark=form.remark)
-        self.db.add(obj); await self.db.flush()
+        self.db.add(obj)
+        await self.db.flush()
         return DictVO.model_validate(obj, from_attributes=True)
 
     async def update_type(self, form: DictUpdate) -> DictVO:
@@ -75,23 +84,19 @@ class DictService:
 
     async def get_dict_codes_by_ids(self, ids: str) -> list[str]:
         """删除前查出 dict_code 列表，供 SSE 广播通知。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        id_list = parse_ids(ids)
         if not id_list:
             return []
-        rows = await self.db.execute(
-            select(SysDict.dict_code).where(SysDict.id.in_(id_list), SysDict.is_deleted == 0)
-        )
+        rows = await self.db.execute(select(SysDict.dict_code).where(SysDict.id.in_(id_list), SysDict.is_deleted == 0))
         return [r.dict_code for r in rows if r.dict_code]
 
     async def delete_type(self, ids: str) -> int:
         """批量逻辑删除字典类型，并级联删除其下所有字典项。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        id_list = parse_ids(ids)
         for did in id_list:
             obj = await self.db.get(SysDict, did)
             if obj:
-                await self.db.execute(
-                    delete(SysDictItem).where(SysDictItem.dict_code == obj.dict_code)
-                )
+                await self.db.execute(delete(SysDictItem).where(SysDictItem.dict_code == obj.dict_code))
                 obj.is_deleted = 1
         await self.db.flush()
         return len(id_list)
@@ -112,19 +117,22 @@ class DictService:
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
         rows = await self.db.execute(
             base.order_by(SysDictItem.sort.asc(), SysDictItem.id.asc())
-            .offset((query.pageNum - 1) * query.pageSize).limit(query.pageSize)
+            .offset((query.pageNum - 1) * query.pageSize)
+            .limit(query.pageSize)
         )
         return PageResult(
             records=[DictItemVO.model_validate(item) for item in rows.scalars().all()],
-            total=total, pageNum=query.pageNum, pageSize=query.pageSize,
+            total=total,
+            pageNum=query.pageNum,
+            pageSize=query.pageSize,
         )
 
     async def get_item_options(self, dict_code: str) -> list[DictItemOptionVO]:
         """返回字典项下拉选项（仅启用项）。"""
         rows = await self.db.execute(
-            select(SysDictItem).where(
-                SysDictItem.dict_code == dict_code, SysDictItem.status == 1
-            ).order_by(SysDictItem.sort.asc())
+            select(SysDictItem)
+            .where(SysDictItem.dict_code == dict_code, SysDictItem.status == 1)
+            .order_by(SysDictItem.sort.asc())
         )
         return [DictItemOptionVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
 
@@ -144,10 +152,16 @@ class DictService:
 
     async def create_item(self, form: DictItemCreate) -> DictItemVO:
         obj = SysDictItem(
-            dict_code=form.dictCode, value=form.value, label=form.label,
-            tag_type=form.tagType, status=form.status, sort=form.sort, remark=form.remark,
+            dict_code=form.dictCode,
+            value=form.value,
+            label=form.label,
+            tag_type=form.tagType,
+            status=form.status,
+            sort=form.sort,
+            remark=form.remark,
         )
-        self.db.add(obj); await self.db.flush()
+        self.db.add(obj)
+        await self.db.flush()
         return DictItemVO.model_validate(obj, from_attributes=True)
 
     async def update_item(self, form: DictItemUpdate) -> DictItemVO:
@@ -167,9 +181,10 @@ class DictService:
 
     async def delete_items(self, ids: str) -> int:
         """批量删除字典项（物理删除）。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        id_list = parse_ids(ids)
         for iid in id_list:
             obj = await self.db.get(SysDictItem, iid)
-            if obj: await self.db.delete(obj)
+            if obj:
+                await self.db.delete(obj)
         await self.db.flush()
         return len(id_list)

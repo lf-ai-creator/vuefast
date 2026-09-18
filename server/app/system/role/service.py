@@ -2,17 +2,20 @@
 
 from datetime import datetime
 
+from loguru import logger
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from app.system.role.constants import DataScopeEnum
-from app.pagination import PageResult
+from app.auth.schemas import SysUserDetails
 from app.auth.token import get_token_manager
+from app.constants import ROOT_ROLE_CODE
 from app.exceptions import BusinessException
+from app.pagination import PageResult
 from app.response import ResultCode
+from app.system.role.constants import DataScopeEnum
 from app.system.role.models import SysRole, SysRoleDept, SysRoleMenu
 from app.system.role.schemas import RoleCreate, RoleOptionVO, RolePageVO, RoleQuery, RoleUpdate, RoleVO
+from app.validation import parse_ids
 
 
 class RoleService:
@@ -20,6 +23,24 @@ class RoleService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def check_management(
+        self, actor: SysUserDetails, role_ids: list[int] | None = None, new_code: str | None = None
+    ) -> None:
+        """普通管理员不能创建、修改或删除超级管理员角色。"""
+        if ROOT_ROLE_CODE in actor.roles:
+            return
+        if new_code == ROOT_ROLE_CODE:
+            raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="不能创建或修改超级管理员角色")
+        if role_ids:
+            protected = await self.db.execute(
+                select(SysRole.id).where(
+                    SysRole.id.in_(role_ids),
+                    SysRole.code == ROOT_ROLE_CODE,
+                )
+            )
+            if protected.scalar() is not None:
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="不能管理超级管理员角色")
 
     async def get_page(self, query: RoleQuery) -> PageResult:
         """分页查询角色列表，支持按名称/编码关键字与状态筛选。"""
@@ -68,7 +89,11 @@ class RoleService:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="角色名称或编码已存在")
 
         role = SysRole(
-            name=form.name, code=form.code, sort=form.sort, status=form.status, data_scope=form.dataScope,
+            name=form.name,
+            code=form.code,
+            sort=form.sort,
+            status=form.status,
+            data_scope=form.dataScope,
             create_time=datetime.now(),
         )
         self.db.add(role)
@@ -79,7 +104,7 @@ class RoleService:
         return await self._to_vo(role)
 
     async def update(self, form: RoleUpdate) -> RoleVO:
-        """更新角色；data_scope 或自定义部门变化时会踢出关联用户的在线会话。"""
+        """更新角色并使关联用户的旧会话失效。"""
         result = await self.db.execute(select(SysRole).where(SysRole.id == form.id, SysRole.is_deleted == 0))
         role = result.scalar_one_or_none()
         if role is None:
@@ -88,17 +113,12 @@ class RoleService:
         exist = await self.db.execute(
             select(SysRole.id).where(
                 (SysRole.name == form.name) | (SysRole.code == form.code),
-                SysRole.is_deleted == 0, SysRole.id != form.id,
+                SysRole.is_deleted == 0,
+                SysRole.id != form.id,
             )
         )
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="角色名称或编码已存在")
-
-        # 记录变更前的 data_scope 与自定义部门，供判断是否需踢出用户
-        old_data_scope = role.data_scope
-        old_dept_ids = set()
-        if old_data_scope == DataScopeEnum.CUSTOM_DEPT:
-            old_dept_ids = set(await self.get_role_dept_ids(role.id))
 
         role.name = form.name
         role.code = form.code
@@ -111,10 +131,8 @@ class RoleService:
         await self._save_relations(form.id, form.menuIds, form.deptIds)
         logger.info(f"Role updated: {role.code}")
 
-        # data_scope 或自定义部门有变化 → 踢出关联用户重新登录
-        new_dept_ids = set(form.deptIds) if form.dataScope == DataScopeEnum.CUSTOM_DEPT else set()
-        if old_data_scope != form.dataScope or old_dept_ids != new_dept_ids:
-            await self._invalidate_role_users_sessions(form.id)
+        # 角色或权限变更后重新登录，避免沿用旧角色及数据范围。
+        await self._invalidate_role_users_sessions(form.id)
 
         return await self._to_vo(role)
 
@@ -134,10 +152,12 @@ class RoleService:
 
     async def delete(self, ids: str) -> int:
         """按逗号分隔的 id 列表批量逻辑删除角色。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        id_list = parse_ids(ids)
         if not id_list:
             raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="请选择要删除的角色")
         await self.db.execute(text("UPDATE sys_role SET is_deleted = 1 WHERE id = ANY(:ids)"), {"ids": id_list})
+        for role_id in id_list:
+            await self._invalidate_role_users_sessions(role_id)
         logger.info(f"Roles deleted: {id_list}")
         return len(id_list)
 
@@ -149,6 +169,7 @@ class RoleService:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="角色不存在")
         role.status = status
         await self.db.flush()
+        await self._invalidate_role_users_sessions(role_id)
 
     async def get_role_form(self, role_id: int) -> RoleUpdate:
         """获取角色编辑表单数据（含已分配菜单/部门 id）。"""
@@ -160,17 +181,13 @@ class RoleService:
 
     async def get_role_menu_ids(self, role_id: int) -> list[int]:
         """返回角色关联的菜单 id 列表。"""
-        rows = await self.db.execute(
-            select(SysRoleMenu.menu_id).where(SysRoleMenu.role_id == role_id)
-        )
-        return [r for r, in rows]
+        rows = await self.db.execute(select(SysRoleMenu.menu_id).where(SysRoleMenu.role_id == role_id))
+        return [r for (r,) in rows]
 
     async def get_role_dept_ids(self, role_id: int) -> list[int]:
         """返回角色关联的数据权限部门 id 列表。"""
-        rows = await self.db.execute(
-            select(SysRoleDept.dept_id).where(SysRoleDept.role_id == role_id)
-        )
-        return [r for r, in rows]
+        rows = await self.db.execute(select(SysRoleDept.dept_id).where(SysRoleDept.role_id == role_id))
+        return [r for (r,) in rows]
 
     async def assign_menus(self, role_id: int, menu_ids: list[int]) -> None:
         """全量替换角色的菜单关联（先删后插）。"""
@@ -178,6 +195,7 @@ class RoleService:
         for mid in menu_ids:
             self.db.add(SysRoleMenu(role_id=role_id, menu_id=mid))
         await self.db.flush()
+        await self._invalidate_role_users_sessions(role_id)
 
     async def _save_relations(self, role_id: int, menu_ids: list[int], dept_ids: list[int]) -> None:
         """全量替换角色的菜单与部门关联（先删后插）。"""
@@ -193,16 +211,24 @@ class RoleService:
         menu_ids = await self.get_role_menu_ids(role.id)
         dept_ids = await self.get_role_dept_ids(role.id)
         return RoleUpdate(
-            id=role.id, name=role.name, code=role.code, sort=role.sort,
-            status=role.status, dataScope=role.data_scope,
-            menuIds=menu_ids, deptIds=dept_ids,
+            id=role.id,
+            name=role.name,
+            code=role.code,
+            sort=role.sort,
+            status=role.status,
+            dataScope=role.data_scope,
+            menuIds=menu_ids,
+            deptIds=dept_ids,
         )
 
     def _to_page_vo(self, role: SysRole) -> RolePageVO:
         """ORM 对象转分页视图对象，仅含基础字段，不查关联表。"""
         return RolePageVO(
-            id=role.id, name=role.name, code=role.code,
-            sort=role.sort, status=role.status,
+            id=role.id,
+            name=role.name,
+            code=role.code,
+            sort=role.sort,
+            status=role.status,
             dataScope=role.data_scope,
             dataScopeLabel=DataScopeEnum.get_label(role.data_scope),
             createTime=str(role.create_time) if role.create_time else None,
@@ -214,10 +240,15 @@ class RoleService:
         menu_ids = await self.get_role_menu_ids(role.id)
         dept_ids = await self.get_role_dept_ids(role.id)
         return RoleVO(
-            id=role.id, name=role.name, code=role.code, sort=role.sort,
-            status=role.status, dataScope=role.data_scope,
+            id=role.id,
+            name=role.name,
+            code=role.code,
+            sort=role.sort,
+            status=role.status,
+            dataScope=role.data_scope,
             dataScopeLabel=DataScopeEnum.get_label(role.data_scope),
-            menuIds=menu_ids, deptIds=dept_ids,
+            menuIds=menu_ids,
+            deptIds=dept_ids,
             createTime=str(role.create_time) if role.create_time else None,
             updateTime=str(role.update_time) if role.update_time else None,
         )

@@ -5,12 +5,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.auth.schemas import SysUserDetails
 from app.auth.token import TokenManager, get_token_manager
+from app.constants import ROOT_ROLE_CODE
+from app.database import get_db
 from app.exceptions import BusinessException
 from app.response import ResultCode
-from app.constants import ROOT_ROLE_CODE
 
 oauth2_scheme = HTTPBearer(auto_error=False)
 
@@ -24,8 +24,12 @@ async def get_current_user(
         raise BusinessException(code=ResultCode.TOKEN_INVALID, msg="未提供认证令牌")
 
     user = await token_manager.parse_token(credentials.credentials)
-    if user is None:
+    if user is None or user.userId is None:
         raise BusinessException(code=ResultCode.TOKEN_INVALID, msg="访问令牌无效或过期")
+    # 根据角色重算，避免历史令牌中错误的超级管理员标志继续绕过权限。
+    user.isRoot = ROOT_ROLE_CODE in user.roles
+    if not user.enabled:
+        raise BusinessException(code=ResultCode.USER_DISABLED, msg="用户已被禁用")
     return user
 
 

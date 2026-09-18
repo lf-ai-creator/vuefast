@@ -24,7 +24,9 @@
     // 忽略 slot props 隐式 any 类型错误（递归组件 slot 转发的已知限制）
     "strictTemplates": false,
     // Wot UI 的 SFC 模板类型与当前 uni 类型存在兼容问题，脚本类型仍保留检查
-    "skipTemplateCodegen": true
+    "skipTemplateCodegen": true,
+    // 保留 Vue useSlots 的真实类型，避免跳过模板后被推断成空对象。
+    "composables": { "useSlots": [] }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "exclude": ["node_modules", "dist"]

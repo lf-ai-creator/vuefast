@@ -1,6 +1,12 @@
 """用户域 ORM 模型。"""
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.system.role.models import SysRole
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, SmallInteger, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship

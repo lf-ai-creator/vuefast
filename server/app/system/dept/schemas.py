@@ -1,6 +1,6 @@
 """部门管理 Schemas。"""
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from app.serializers import BigId
 
@@ -22,7 +22,7 @@ class DeptUpdate(BaseModel):
     id: BigId
     name: str = Field(..., min_length=1, max_length=100)
     code: str = Field(..., min_length=1, max_length=100)
-    parentId: BigId = Field(default=0)
+    parentId: BigId = Field(default=0, validation_alias=AliasChoices("parentId", "parent_id"))
     sort: int = Field(default=0)
     status: int = Field(default=1)
 

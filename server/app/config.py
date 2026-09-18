@@ -1,5 +1,6 @@
 """应用配置，从 .env 与环境变量读取（pydantic-settings）。"""
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
 
     # ── 认证 ──
     SESSION_TYPE: str = "jwt"
-    JWT_SECRET_KEY: str = "SecretKey012345678901234567890123456789012345678901234567890123456789"
+    JWT_SECRET_KEY: str = Field(..., min_length=32, description="至少32字符的随机签名密钥")
     ACCESS_TOKEN_TTL: int = 7200
     REFRESH_TOKEN_TTL: int = 604800
     ALLOW_MULTI_LOGIN: bool = True
@@ -44,8 +45,8 @@ class Settings(BaseSettings):
 
     # ── 限流 ──
     RATE_LIMIT_ENABLED: bool = True
-    RATE_LIMIT_IP_LIMIT: int = 1000     # IP 窗口内最大请求数
-    RATE_LIMIT_IP_WINDOW: int = 60      # IP 滑动窗口大小（秒）
+    RATE_LIMIT_IP_LIMIT: int = 1000  # IP 窗口内最大请求数
+    RATE_LIMIT_IP_WINDOW: int = 60  # IP 滑动窗口大小（秒）
 
     # ── CORS ──
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"

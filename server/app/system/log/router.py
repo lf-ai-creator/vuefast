@@ -1,24 +1,23 @@
 """操作日志管理。"""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select, cast, String, delete
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field, field_serializer
 import re
-
-from app.serializers import BigId
-
 from datetime import date, datetime, time, timedelta
 
-from app.database import get_db
-from app.pagination import PageResult
-from app.dependencies import get_current_user, require_perm
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field, field_serializer
+from sqlalchemy import String, cast, delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.schemas import SysUserDetails
 from app.constants import ROOT_ROLE_CODE
-from app.system.log.operation_log import operation_log
-from app.system.log.constants import ActionTypeEnum, LogModuleEnum
+from app.database import get_db
+from app.dependencies import get_current_user, require_perm
+from app.pagination import PageResult
 from app.response import Result
+from app.serializers import BigId
+from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.models import SysLog
+from app.system.log.operation_log import operation_log
 
 router = APIRouter(prefix="/api/v1/logs", tags=["日志管理"])
 
@@ -97,9 +96,11 @@ class LogService:
         self.db = db
 
     async def count_history(self, before_date: date) -> int:
-        return (await self.db.execute(
-            select(func.count()).select_from(SysLog).where(SysLog.create_time < history_cutoff(before_date))
-        )).scalar() or 0
+        return (
+            await self.db.execute(
+                select(func.count()).select_from(SysLog).where(SysLog.create_time < history_cutoff(before_date))
+            )
+        ).scalar() or 0
 
     async def clear_history(self, before_date: date) -> int:
         result = await self.db.execute(delete(SysLog).where(SysLog.create_time < history_cutoff(before_date)))
@@ -116,18 +117,18 @@ class LogService:
         if query.keywords:
             kw = f"%{query.keywords}%"
             conditions.append(
-                SysLog.title.ilike(kw)
-                | SysLog.operator_name.ilike(kw)
-                | cast(SysLog.ip, String).ilike(kw)
+                SysLog.title.ilike(kw) | SysLog.operator_name.ilike(kw) | cast(SysLog.ip, String).ilike(kw)
             )
         if query.createTime:
             start_date, end_date = query.createTime
             if start_date > end_date:
                 raise HTTPException(status_code=422, detail="开始日期不能晚于结束日期")
-            conditions.extend([
-                SysLog.create_time >= datetime.combine(start_date, time.min),
-                SysLog.create_time < datetime.combine(end_date + timedelta(days=1), time.min),
-            ])
+            conditions.extend(
+                [
+                    SysLog.create_time >= datetime.combine(start_date, time.min),
+                    SysLog.create_time < datetime.combine(end_date + timedelta(days=1), time.min),
+                ]
+            )
 
         stmt = select(SysLog)
         if conditions:
@@ -135,9 +136,7 @@ class LogService:
         base = stmt
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
         offset = (query.pageNum - 1) * query.pageSize
-        rows = await self.db.execute(
-            stmt.order_by(SysLog.create_time.desc()).offset(offset).limit(query.pageSize)
-        )
+        rows = await self.db.execute(stmt.order_by(SysLog.create_time.desc()).offset(offset).limit(query.pageSize))
         vo_list = [LogVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
         return PageResult(records=vo_list, total=total, pageNum=query.pageNum, pageSize=query.pageSize)
 
@@ -183,15 +182,13 @@ class LogService:
 
         # today UV
         r = await self.db.execute(
-            select(func.count(func.distinct(SysLog.ip)))
-            .where(func.date(SysLog.create_time) == today)
+            select(func.count(func.distinct(SysLog.ip))).where(func.date(SysLog.create_time) == today)
         )
         today_uv = r.scalar() or 0
 
         # yesterday UV
         r = await self.db.execute(
-            select(func.count(func.distinct(SysLog.ip)))
-            .where(func.date(SysLog.create_time) == yesterday)
+            select(func.count(func.distinct(SysLog.ip))).where(func.date(SysLog.create_time) == yesterday)
         )
         yest_uv = r.scalar() or 0
 
@@ -200,15 +197,11 @@ class LogService:
         total_uv = r.scalar() or 0
 
         # today PV
-        r = await self.db.execute(
-            select(func.count()).where(func.date(SysLog.create_time) == today)
-        )
+        r = await self.db.execute(select(func.count()).where(func.date(SysLog.create_time) == today))
         today_pv = r.scalar() or 0
 
         # yesterday PV
-        r = await self.db.execute(
-            select(func.count()).where(func.date(SysLog.create_time) == yesterday)
-        )
+        r = await self.db.execute(select(func.count()).where(func.date(SysLog.create_time) == yesterday))
         yest_pv = r.scalar() or 0
 
         # total PV
@@ -240,13 +233,18 @@ async def get_logs(
     db: AsyncSession = Depends(get_db),
 ):
     q = LogQuery(
-        pageNum=pageNum, pageSize=pageSize, module=module, actionType=actionType,
-        status=status, keywords=keywords, createTime=createTime,
+        pageNum=pageNum,
+        pageSize=pageSize,
+        module=module,
+        actionType=actionType,
+        status=status,
+        keywords=keywords,
+        createTime=createTime,
     )
     return Result(data=await LogService(db).get_page(q))
 
 
-@router.get("/analytics/trend", summary="访问趋势统计")
+@router.get("/analytics/trend", summary="访问趋势统计", dependencies=[Depends(get_current_user)])
 async def get_visit_trend(
     startDate: date = Query(..., description="开始时间 yyyy-MM-dd"),
     endDate: date = Query(..., description="结束时间 yyyy-MM-dd"),
@@ -255,7 +253,7 @@ async def get_visit_trend(
     return Result(data=await LogService(db).get_visit_trend(startDate, endDate))
 
 
-@router.get("/analytics/overview", summary="访问统计概览")
+@router.get("/analytics/overview", summary="访问统计概览", dependencies=[Depends(get_current_user)])
 async def get_visit_overview(db: AsyncSession = Depends(get_db)):
     return Result(data=await LogService(db).get_visit_overview())
 

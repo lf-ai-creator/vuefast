@@ -29,10 +29,10 @@ Python 使用四空格缩进，函数和模块使用 `snake_case`，类使用 `P
 
 ## 提交与拉取请求
 
-当前检出目录没有可用的 Git 历史。客户端 Commitlint 配置采用 Conventional Commits，例如 `fix(auth): 修复令牌过期处理`。每次提交聚焦一个明确改动。
+Git 历史及客户端 Commitlint 配置采用 Conventional Commits，常用 `fix:`、`feat:` 和 `chore:`，例如 `fix(auth): 修复令牌过期处理`。每次提交聚焦一个明确改动。
 
 拉取请求应说明行为变化、关联相关问题并列出验证结果；界面变化附截图，配置或数据库迁移变化说明操作要求。
 
 ## 安全与配置
 
-禁止提交凭据。执行后端集成验证前配置 PostgreSQL 和 Redis。客户端环境变量会进入公开构建产物，不得存放后端密钥。
+禁止提交凭据。复制 `server/.env.example` 为 `.env`，配置 PostgreSQL、Redis 和至少 32 字符的随机 `JWT_SECRET_KEY`。客户端环境变量会进入公开构建产物，不得存放后端密钥。

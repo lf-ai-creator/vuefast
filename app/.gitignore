@@ -18,7 +18,6 @@ dist
 src/pages.json
 
 # 生成物：插件在 dev/build 时自动生成
-src/types/auto-imports.d.ts
 src/types/components.d.ts
 src/types/uni-pages.d.ts
 

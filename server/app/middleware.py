@@ -9,30 +9,24 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
-from app.rate_limit import check_rate_limit
 from app.exceptions import BusinessException
+from app.rate_limit import check_rate_limit
 
 
 def setup_cors(app):
-    # ALLOWED_ORIGINS 为 * 时放行所有来源（带凭据时浏览器不允许 *，故关闭 credentials）
-    if settings.ALLOWED_ORIGINS.strip() == "*":
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=False,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-            expose_headers=["Content-Disposition"],
-            max_age=600,
-        )
-        return
-
+    origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"https?://.*" if settings.DEBUG else settings.ALLOWED_ORIGINS or "http://localhost",
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials="*" not in origins,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "X-Client-Platform",
+            "X-Client-Platform-Version",
+        ],
         expose_headers=["Content-Disposition"],
         max_age=600,
     )

@@ -3,17 +3,18 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Integer, SmallInteger, func
+from sqlalchemy import BigInteger, DateTime, SmallInteger, func
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.config import settings
 
-
 # ── ORM 声明基类 ──
+
 
 class Base(DeclarativeBase):
     """ORM 声明式基类。"""
+
     pass
 
 
@@ -23,6 +24,7 @@ class TimestampMixin:
     用 Python 层 default=func.now() 在插入时由应用显式写入时间戳，
     不依赖库表列的默认值（共享库部分表 create_time 为 NOT NULL 且无默认）。
     """
+
     create_time: Mapped[datetime | None] = mapped_column(
         DateTime, default=func.now(), server_default=func.now(), comment="创建时间"
     )
@@ -39,9 +41,8 @@ class SoftDeleteMixin:
 
 class BaseIdMixin:
     """自增主键 ID。"""
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="主键ID"
-    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
 
 
 engine = create_async_engine(

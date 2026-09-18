@@ -3,17 +3,19 @@
 import asyncio
 import base64
 import io
-import random
 import string
 import uuid
+from secrets import SystemRandom, choice
 
-from PIL import Image, ImageDraw, ImageFont
 from loguru import logger
+from PIL import Image, ImageDraw, ImageFont
 
 from app.auth.schemas import CaptchaResult
 from app.captcha.constants import CAPTCHA_TTL
 from app.constants import REDIS_CAPTCHA_PREFIX
 from app.redis import get_redis
+
+_IMAGE_RANDOM = SystemRandom()
 
 
 class CaptchaService:
@@ -25,7 +27,7 @@ class CaptchaService:
         chars = string.ascii_letters + string.digits
         # 排除易混淆字符
         chars = chars.translate(str.maketrans("", "", "0OIl1"))
-        return "".join(random.choices(chars, k=length))
+        return "".join((choice(chars) for _ in range(length)))
 
     @staticmethod
     def _generate_image(code: str, width: int = 130, height: int = 50) -> bytes:
@@ -40,20 +42,20 @@ class CaptchaService:
             font = ImageFont.load_default()
 
         for i, char in enumerate(code):
-            x = 15 + i * 28 + random.randint(-3, 3)
-            y = random.randint(5, 15)
-            r, g, b = random.randint(0, 100), random.randint(0, 100), random.randint(0, 100)
+            x = 15 + i * 28 + _IMAGE_RANDOM.randint(-3, 3)
+            y = _IMAGE_RANDOM.randint(5, 15)
+            r, g, b = _IMAGE_RANDOM.randint(0, 100), _IMAGE_RANDOM.randint(0, 100), _IMAGE_RANDOM.randint(0, 100)
             draw.text((x, y), char, font=font, fill=(r, g, b))
 
         # 干扰线
         for _ in range(5):
-            x1, y1 = random.randint(0, width), random.randint(0, height)
-            x2, y2 = random.randint(0, width), random.randint(0, height)
+            x1, y1 = _IMAGE_RANDOM.randint(0, width), _IMAGE_RANDOM.randint(0, height)
+            x2, y2 = _IMAGE_RANDOM.randint(0, width), _IMAGE_RANDOM.randint(0, height)
             draw.line((x1, y1, x2, y2), fill=(180, 180, 180), width=1)
 
         # 干扰点
         for _ in range(50):
-            x, y = random.randint(0, width), random.randint(0, height)
+            x, y = _IMAGE_RANDOM.randint(0, width), _IMAGE_RANDOM.randint(0, height)
             draw.point((x, y), fill=(180, 180, 180))
 
         buf = io.BytesIO()
@@ -84,6 +86,5 @@ class CaptchaService:
         """校验验证码 — 一次性使用。"""
         redis_client = await get_redis()
         key = f"{REDIS_CAPTCHA_PREFIX}{captcha_id}"
-        stored = await redis_client.get(key)
-        await redis_client.delete(key)
+        stored = await redis_client.getdel(key)
         return stored is not None and stored == code.lower()

@@ -82,7 +82,7 @@ const AuthAPI = {
   /**
    * 发送短信验证码
    *
-   * 演示环境说明：短信服务未配置，验证码固定为 123456
+   * 短信服务接入前此接口返回不可用，请使用账号密码登录
    */
   sendSmsLoginCode(mobile: string): Promise<void> {
     const mobileSafe = encodeURIComponent(mobile);
@@ -133,7 +133,7 @@ const AuthAPI = {
   /**
    * 微信小程序绑定手机号
    *
-   * 演示环境说明：短信服务未配置，验证码固定为 123456
+   * 短信服务接入前此接口返回不可用，请使用账号密码登录
    */
   wxMaBindMobile(data: WxMaBindMobileParams): Promise<LoginResult> {
     return request<LoginResult>({

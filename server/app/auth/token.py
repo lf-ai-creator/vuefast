@@ -8,8 +8,8 @@ from typing import Any
 import jwt
 from loguru import logger
 
-from app.config import settings
 from app.auth.schemas import AuthenticationToken, SysUserDetails
+from app.config import settings
 
 
 class TokenManager(ABC):
@@ -50,6 +50,7 @@ class TokenManager(ABC):
 # JWT 实现
 # =====================================================================
 
+
 class JwtTokenManager(TokenManager):
     """JWT Token 管理器。"""
 
@@ -68,6 +69,7 @@ class JwtTokenManager(TokenManager):
             "dataScopes": user.dataScopes,
             "roles": list(user.roles),
             "isRoot": user.isRoot,
+            "enabled": user.enabled,
         }
 
     @staticmethod
@@ -79,14 +81,14 @@ class JwtTokenManager(TokenManager):
             dataScopes=claims.get("dataScopes", []),
             roles=set(claims.get("roles", [])),
             isRoot=claims.get("isRoot", False),
-            enabled=True,
+            enabled=claims.get("enabled", True),
         )
 
     async def _get_token_version(self, user_id: int) -> str:
         """从 Redis 获取用户 token 版本号（踢人时校验）。"""
         if self._redis is None:
-            return "1"
-        return await self._redis.get(f"token:version:{user_id}") or "1"
+            return "0"
+        return await self._redis.get(f"token:version:{user_id}") or "0"
 
     async def generate_token(self, user: SysUserDetails) -> AuthenticationToken:
         now = int(time.time())
@@ -101,7 +103,7 @@ class JwtTokenManager(TokenManager):
             "type": "access",
         }
         refresh_payload = {
-            "userId": user.userId,
+            **self._user_claims(user),
             "sub": str(user.userId),
             "iat": now,
             "exp": now + self._refresh_ttl,
@@ -144,11 +146,10 @@ class JwtTokenManager(TokenManager):
             token_version = await self._get_token_version(claims.get("userId", 0))
             if claims.get("tokenVersion") != token_version:
                 return None
-            user = SysUserDetails(
-                userId=claims["userId"],
-                username=claims.get("username", ""),
-                roles=set(claims.get("roles", [])),
-            )
+            # 旧版刷新令牌未携带权限上下文，要求重新登录。
+            if not claims.get("username"):
+                return None
+            user = self._claims_to_user(claims)
             return await self.generate_token(user)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             return None
@@ -173,6 +174,7 @@ class JwtTokenManager(TokenManager):
 # Redis-Token 实现
 # =====================================================================
 
+
 class RedisTokenManager(TokenManager):
     """Redis Token 管理器。"""
 
@@ -185,21 +187,19 @@ class RedisTokenManager(TokenManager):
         access_token = uuid.uuid4().hex
         refresh_token = uuid.uuid4().hex
 
-        user_data = user.model_dump(exclude={"password"})
+        user_data = user.model_dump(mode="json", exclude={"password"})
+        user_data["tokenVersion"] = await self._redis.get(f"token:version:{user.userId}") or "0"
         # user_id → tokens 映射（踢人时遍历）
         token_set_key = f"token:user_tokens:{user.userId}"
         await self._redis.sadd(token_set_key, access_token)
         # 集合过期时间比 access_token 多留 1 小时，使踢人遍历时 token 仍在此集合内
         await self._redis.expire(token_set_key, self._access_ttl + 3600)
 
+        await self._redis.setex(f"token:access:{access_token}", self._access_ttl, user.username)
+        await self._redis.setex(f"token:refresh:{refresh_token}", self._refresh_ttl, await self._encode(user_data))
         await self._redis.setex(
-            f"token:access:{access_token}", self._access_ttl, user.username
-        )
-        await self._redis.setex(
-            f"token:refresh:{refresh_token}", self._refresh_ttl, str(user.userId)
-        )
-        await self._redis.setex(
-            f"token:user_info:{access_token}", self._access_ttl,
+            f"token:user_info:{access_token}",
+            self._access_ttl,
             (await self._encode(user_data)),
         )
         return AuthenticationToken(
@@ -214,6 +214,9 @@ class RedisTokenManager(TokenManager):
             return None
         try:
             data = await self._decode(cached)
+            version = await self._redis.get(f"token:version:{data['userId']}") or "0"
+            if data.get("tokenVersion") != version:
+                return None
             return SysUserDetails(**data)
         except Exception:
             return None
@@ -223,18 +226,30 @@ class RedisTokenManager(TokenManager):
         return raw is not None
 
     async def refresh_token(self, refresh_token: str) -> AuthenticationToken | None:
-        user_id = await self._redis.get(f"token:refresh:{refresh_token}")
-        if user_id is None:
+        # GETDEL 原子消费，避免同一刷新令牌并发重复使用。
+        raw = await self._redis.getdel(f"token:refresh:{refresh_token}")
+        if raw is None:
             return None
-        await self._redis.delete(f"token:refresh:{refresh_token}")
-        user = SysUserDetails(userId=int(user_id))
-        return await self.generate_token(user)
+        try:
+            data = await self._decode(raw)
+            if not isinstance(data, dict) or not data.get("username"):
+                return None
+            version = await self._redis.get(f"token:version:{data['userId']}") or "0"
+            if data.get("tokenVersion") != version:
+                return None
+            return await self.generate_token(SysUserDetails(**data))
+        except (ValueError, TypeError, KeyError):
+            return None
 
     async def invalidate_token(self, token: str) -> None:
+        user = await self.parse_token(token)
+        if user and user.userId:
+            await self.invalidate_user_sessions(user.userId)
         await self._redis.delete(f"token:access:{token}")
         await self._redis.delete(f"token:user_info:{token}")
 
     async def invalidate_user_sessions(self, user_id: int) -> None:
+        await self._redis.incr(f"token:version:{user_id}")
         token_set_key = f"token:user_tokens:{user_id}"
         tokens = await self._redis.smembers(token_set_key)
         for t in tokens:
@@ -246,11 +261,13 @@ class RedisTokenManager(TokenManager):
     @staticmethod
     async def _encode(data: dict) -> str:
         import orjson
+
         return orjson.dumps(data).decode()
 
     @staticmethod
     async def _decode(raw: str) -> dict:
         import orjson
+
         return orjson.loads(raw)
 
 

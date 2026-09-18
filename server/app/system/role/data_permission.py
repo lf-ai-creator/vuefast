@@ -8,7 +8,7 @@ data_scope 取值（sys_role.data_scope）：
     5 CUSTOM_DEPT    自定义部门
 
 多角色取并集（OR），任一 ALL 则全量放行。
-无 dataScopes / 无生效条件时不过滤（不拒绝）。
+已登录用户无 dataScopes 或无生效条件时拒绝访问数据。
 
 用法:
     from app.system.role.data_permission import apply_data_scope
@@ -23,13 +23,13 @@ from __future__ import annotations
 
 from sqlalchemy import ColumnElement, false, or_, select, text
 
-from app.constants import ROOT_ROLE_CODE
-from app.system.role.constants import DataScopeEnum
 from app.auth.schemas import SysUserDetails
+from app.constants import ROOT_ROLE_CODE
 from app.system.dept.models import SysDept
-
+from app.system.role.constants import DataScopeEnum
 
 # ── 跳过判断 ──
+
 
 def _should_skip(user: SysUserDetails | None) -> bool:
     """超管 / 未登录 / 角色含 ALL → 不附加过滤。"""
@@ -44,13 +44,11 @@ def _should_skip(user: SysUserDetails | None) -> bool:
 
 def _has_all_data_scope(user: SysUserDetails) -> bool:
     """任一角色 dataScope == 1。"""
-    return any(
-        scope.get("dataScope") == DataScopeEnum.ALL
-        for scope in (user.dataScopes or [])
-    )
+    return any(scope.get("dataScope") == DataScopeEnum.ALL for scope in (user.dataScopes or []))
 
 
 # ── 单个角色条件 ──
+
 
 def _build_role_expression(
     dept_col: ColumnElement | None,
@@ -73,9 +71,9 @@ def _build_role_expression(
         subquery = select(SysDept.id).where(
             or_(
                 SysDept.id == dept_id,
-                text(
-                    "(',' || COALESCE(tree_path, '') || ',') LIKE :dp_pattern"
-                ).bindparams(dp_pattern=f"%,{dept_id},%"),
+                text("(',' || COALESCE(tree_path, '') || ',') LIKE :dp_pattern").bindparams(
+                    dp_pattern=f"%,{dept_id},%"
+                ),
             )
         )
         return dept_col.in_(subquery)
@@ -104,12 +102,13 @@ def _build_role_expression(
 
 # ── 多角色并集 ──
 
+
 def _build_union_expression(
     dept_col: ColumnElement | None,
     user_col: ColumnElement | None,
     user: SysUserDetails,
 ) -> ColumnElement | None:
-    """各角色条件 OR 连接；并集为空返回 None（不过滤）。"""
+    """各角色条件 OR 连接；并集为空返回 None。"""
     scopes = user.dataScopes or []
     if not scopes:
         return None
@@ -123,6 +122,7 @@ def _build_union_expression(
 
 
 # ── 公共 API ──
+
 
 def build_data_scope_filters(
     user: SysUserDetails | None,
@@ -138,7 +138,7 @@ def build_data_scope_filters(
         return []
     expr = _build_union_expression(dept_col, user_col, user)
     if expr is None:
-        return []
+        return [false()] if dept_col is not None or user_col is not None else []
     return [expr]
 
 

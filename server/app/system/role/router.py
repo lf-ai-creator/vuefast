@@ -10,17 +10,21 @@ from app.response import Result
 from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.operation_log import operation_log
 from app.system.role.schemas import (
-    RoleCreate, RoleQuery, RoleUpdate,
+    RoleCreate,
+    RoleQuery,
+    RoleUpdate,
 )
 from app.system.role.service import RoleService
 
-router = APIRouter(prefix="/api/v1/roles", tags=["角色管理"])
+router = APIRouter(prefix="/api/v1/roles", tags=["角色管理"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", summary="角色分页列表", dependencies=[Depends(require_perm("sys:role:list"))])
 async def get_role_page(
-    pageNum: int = Query(default=1, ge=1), pageSize: int = Query(default=10, ge=1, le=100),
-    keywords: str | None = None, status: int | None = None,
+    pageNum: int = Query(default=1, ge=1),
+    pageSize: int = Query(default=10, ge=1, le=100),
+    keywords: str | None = None,
+    status: int | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     query = RoleQuery(pageNum=pageNum, pageSize=pageSize, keywords=keywords, status=status)
@@ -47,6 +51,7 @@ async def create_role(
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await RoleService(db).check_management(user, new_code=form.code)
     vo = await RoleService(db).create(form)
     return Result(data=vo)
 
@@ -61,18 +66,25 @@ async def update_role(
     db: AsyncSession = Depends(get_db),
 ):
     form.id = role_id
+    await RoleService(db).check_management(user, [role_id], form.code)
     vo = await RoleService(db).update(form)
     return Result(data=vo)
 
 
 @router.delete("/{ids}", summary="删除角色", dependencies=[Depends(require_perm("sys:role:delete"))])
-async def delete_roles(ids: str, db: AsyncSession = Depends(get_db)):
+async def delete_roles(ids: str, db: AsyncSession = Depends(get_db), user: SysUserDetails = Depends(get_current_user)):
+    from app.validation import parse_ids
+
+    await RoleService(db).check_management(user, parse_ids(ids))
     count = await RoleService(db).delete(ids)
     return Result(data=count, msg=f"成功删除 {count} 条记录")
 
 
 @router.put("/{role_id}/status", summary="修改角色状态", dependencies=[Depends(require_perm("sys:role:update"))])
-async def update_role_status(role_id: int, status: int, db: AsyncSession = Depends(get_db)):
+async def update_role_status(
+    role_id: int, status: int, db: AsyncSession = Depends(get_db), user: SysUserDetails = Depends(get_current_user)
+):
+    await RoleService(db).check_management(user, [role_id])
     await RoleService(db).update_status(role_id, status)
     return Result(data=None)
 
@@ -92,11 +104,14 @@ async def assign_role_menus(
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await RoleService(db).check_management(user, [role_id])
     await RoleService(db).assign_menus(role_id, menuIds)
     return Result(data=None)
 
 
-@router.get("/{role_id}/dept-ids", summary="获取角色部门ID集合", dependencies=[Depends(require_perm("sys:role:update"))])
+@router.get(
+    "/{role_id}/dept-ids", summary="获取角色部门ID集合", dependencies=[Depends(require_perm("sys:role:update"))]
+)
 async def get_role_dept_ids(role_id: int, db: AsyncSession = Depends(get_db)):
     ids = await RoleService(db).get_role_dept_ids(role_id)
     return Result(data=ids)

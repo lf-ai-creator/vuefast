@@ -1,21 +1,21 @@
 """系统配置管理。"""
 
-from fastapi import APIRouter, Depends, Query, Request
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query, Request
+from loguru import logger
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.schemas import SysUserDetails
-from app.serializers import BigId
-from loguru import logger
-
-from app.pagination import PageResult
 from app.database import get_db
-from app.redis import get_redis
 from app.dependencies import get_current_user, require_perm
 from app.exceptions import BusinessException
+from app.pagination import PageResult
+from app.redis import get_redis
 from app.response import Result, ResultCode
+from app.serializers import BigId
 from app.system.config.models import SysConfig
 from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.operation_log import operation_log
@@ -32,9 +32,13 @@ class ConfigQuery(BaseModel):
 class ConfigForm(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: BigId | None = None
-    configName: str = Field(..., min_length=1, max_length=50, validation_alias=AliasChoices("configName", "config_name"))
+    configName: str = Field(
+        ..., min_length=1, max_length=50, validation_alias=AliasChoices("configName", "config_name")
+    )
     configKey: str = Field(..., min_length=1, max_length=50, validation_alias=AliasChoices("configKey", "config_key"))
-    configValue: str = Field(..., min_length=1, max_length=100, validation_alias=AliasChoices("configValue", "config_value"))
+    configValue: str = Field(
+        ..., min_length=1, max_length=100, validation_alias=AliasChoices("configValue", "config_value")
+    )
     remark: str | None = Field(default=None, max_length=255)
 
 
@@ -75,7 +79,9 @@ class ConfigService:
 
     async def get_by_key(self, key: str) -> str | None:
         """按 config_key 读取配置值；未命中返回 None。"""
-        r = await self.db.execute(select(SysConfig.config_value).where(SysConfig.config_key == key, SysConfig.is_deleted == 0))
+        r = await self.db.execute(
+            select(SysConfig.config_value).where(SysConfig.config_key == key, SysConfig.is_deleted == 0)
+        )
         return r.scalar()
 
     async def create(self, form: ConfigForm) -> ConfigVO:
@@ -83,7 +89,9 @@ class ConfigService:
         exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey))
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="配置键已存在")
-        obj = SysConfig(config_name=form.configName, config_key=form.configKey, config_value=form.configValue, remark=form.remark)
+        obj = SysConfig(
+            config_name=form.configName, config_key=form.configKey, config_value=form.configValue, remark=form.remark
+        )
         self.db.add(obj)
         await self.db.flush()
         return ConfigVO.model_validate(obj, from_attributes=True)
@@ -93,7 +101,9 @@ class ConfigService:
         obj = await self.db.get(SysConfig, config_id)
         if obj is None or obj.is_deleted:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="配置不存在")
-        exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey, SysConfig.id != config_id))
+        exist = await self.db.execute(
+            select(SysConfig.id).where(SysConfig.config_key == form.configKey, SysConfig.id != config_id)
+        )
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="配置键已存在")
         obj.config_name = form.configName
@@ -128,9 +138,7 @@ class ConfigService:
         rows = await self.db.execute(select(SysConfig.config_key, SysConfig.config_value, SysConfig.is_deleted))
         configs = rows.all()
         registry = "config:cache:__managed_keys__"
-        previous_keys = {
-            key.decode() if isinstance(key, bytes) else key for key in await redis.smembers(registry)
-        }
+        previous_keys = {key.decode() if isinstance(key, bytes) else key for key in await redis.smembers(registry)}
         active = {f"config:{key}": value or "" for key, value, deleted in configs if not deleted}
         deleted_keys = {f"config:{key}" for key, _, deleted in configs if deleted}
         stale_keys = (previous_keys | deleted_keys) - active.keys()
@@ -154,7 +162,9 @@ async def get_configs(
     keywords: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    return Result(data=await ConfigService(db).get_page(ConfigQuery(pageNum=pageNum, pageSize=pageSize, keywords=keywords)))
+    return Result(
+        data=await ConfigService(db).get_page(ConfigQuery(pageNum=pageNum, pageSize=pageSize, keywords=keywords))
+    )
 
 
 @router.get("/{config_id}/form", summary="配置表单数据", dependencies=[Depends(require_perm("sys:config:update"))])
@@ -162,7 +172,7 @@ async def get_config_form(config_id: int, db: AsyncSession = Depends(get_db)):
     return Result(data=await ConfigService(db).get_config_form(config_id))
 
 
-@router.get("/{config_key}/value", summary="根据key获取配置值")
+@router.get("/{config_key}/value", summary="根据key获取配置值", dependencies=[Depends(require_perm("sys:config:list"))])
 async def get_config_value(config_key: str, db: AsyncSession = Depends(get_db)):
     return Result(data=await ConfigService(db).get_by_key(config_key))
 
@@ -170,7 +180,9 @@ async def get_config_value(config_key: str, db: AsyncSession = Depends(get_db)):
 @router.put("/refresh", summary="刷新配置缓存", dependencies=[Depends(require_perm("sys:config:refresh"))])
 @operation_log(module=LogModuleEnum.CONFIG, action_type=ActionTypeEnum.UPDATE, title="刷新配置缓存")
 async def refresh_config_cache(
-    request: Request, user: SysUserDetails = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    request: Request,
+    user: SysUserDetails = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     return Result(data=await ConfigService(db).refresh_cache())
 
@@ -178,8 +190,10 @@ async def refresh_config_cache(
 @router.post("", summary="创建配置", dependencies=[Depends(require_perm("sys:config:create"))])
 @operation_log(module=LogModuleEnum.CONFIG, action_type=ActionTypeEnum.INSERT, title="新增配置")
 async def create_config(
-    request: Request, form: ConfigForm,
-    user: SysUserDetails = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    request: Request,
+    form: ConfigForm,
+    user: SysUserDetails = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     return Result(data=await ConfigService(db).create(form))
 

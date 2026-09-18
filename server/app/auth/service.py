@@ -1,13 +1,14 @@
 """认证服务。"""
 
+from fastapi import HTTPException
+from loguru import logger
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from app.constants import ROOT_ROLE_CODE
-from app.auth.utils import verify_password
 from app.auth.schemas import SecurityUser, SysUserDetails
 from app.auth.token import get_token_manager
+from app.auth.utils import verify_password
+from app.constants import ROOT_ROLE_CODE
 from app.exceptions import BusinessException
 from app.response import ResultCode
 from app.system.user.models import SysUser
@@ -21,9 +22,7 @@ class AuthService:
 
     async def login(self, username: str, password: str) -> dict:
         """账号密码登录。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.username == username, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.username == username, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.USERNAME_NOT_FOUND, msg="用户名不存在")
@@ -34,22 +33,12 @@ class AuthService:
         return await self._build_token(user)
 
     async def login_by_sms(self, mobile: str, code: str) -> dict:
-        """短信验证码登录。"""
-        # TODO: 接入真实短信验证码校验
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.mobile == mobile, SysUser.is_deleted == 0)
-        )
-        user = result.scalar_one_or_none()
-        if user is None:
-            raise BusinessException(code=ResultCode.USERNAME_NOT_FOUND, msg="手机号未注册")
-        if user.status != 1:
-            raise BusinessException(code=ResultCode.USER_DISABLED, msg="用户已被禁用")
-        return await self._build_token(user)
+        """短信服务接入前禁止签发未经验证的令牌。"""
+        raise HTTPException(status_code=501, detail="短信登录尚未接入，请使用账号密码登录")
 
     async def send_sms_code(self, mobile: str) -> None:
-        """发送短信验证码（占位）。"""
-        # TODO: 接入真实短信服务
-        logger.info(f"Send SMS code to {mobile}")
+        """短信服务接入前明确返回不可用。"""
+        raise HTTPException(status_code=501, detail="短信服务尚未接入")
 
     async def logout(self, token: str) -> None:
         """用户登出。"""
@@ -72,9 +61,7 @@ class AuthService:
 
     async def get_user_info(self, user_id: int) -> dict:
         """获取当前登录用户信息（角色+权限）。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="用户不存在")
@@ -116,9 +103,7 @@ class AuthService:
 
     async def login_by_qr(self, user_id: int) -> dict:
         """扫码登录后签发令牌。"""
-        result = await self.db.execute(
-            select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0)
-        )
+        result = await self.db.execute(select(SysUser).where(SysUser.id == user_id, SysUser.is_deleted == 0))
         user = result.scalar_one_or_none()
         if user is None:
             raise BusinessException(code=ResultCode.USERNAME_NOT_FOUND, msg="用户不存在")
@@ -188,15 +173,19 @@ class AuthService:
                     {"code": row.code},
                 )
                 custom_dept_ids = [d.id for d in dept_result]
-                scopes.append({
-                    "roleCode": row.code,
-                    "dataScope": row.data_scope,
-                    "customDeptIds": custom_dept_ids,
-                })
+                scopes.append(
+                    {
+                        "roleCode": row.code,
+                        "dataScope": row.data_scope,
+                        "customDeptIds": custom_dept_ids,
+                    }
+                )
             else:
-                scopes.append({
-                    "roleCode": row.code,
-                    "dataScope": row.data_scope,
-                    "customDeptIds": [],
-                })
+                scopes.append(
+                    {
+                        "roleCode": row.code,
+                        "dataScope": row.data_scope,
+                        "customDeptIds": [],
+                    }
+                )
         return scopes

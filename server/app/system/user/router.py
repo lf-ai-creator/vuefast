@@ -7,24 +7,30 @@
 import asyncio
 import io
 
-from fastapi import APIRouter, Depends, Query, Request, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from app.auth.schemas import SysUserDetails
 from app.database import get_db
 from app.dependencies import get_current_user, require_perm
-from app.auth.schemas import SysUserDetails
 from app.response import Result
+from app.system.log.constants import ActionTypeEnum, LogModuleEnum
+from app.system.log.operation_log import operation_log
 from app.system.user.schemas import (
-    EmailUpdateForm, ExcelResultVO, MobileUpdateForm, PasswordResetForm,
+    EmailUpdateForm,
+    ExcelResultVO,
+    MobileUpdateForm,
+    PasswordResetForm,
     PasswordUpdateForm,
-    PasswordVerifyForm, UserCreate, UserProfileForm, UserQuery,
+    PasswordVerifyForm,
+    UserCreate,
+    UserProfileForm,
+    UserQuery,
     UserUpdate,
 )
 from app.system.user.service import UserService
-from app.system.log.operation_log import operation_log
-from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 
 router = APIRouter(prefix="/api/v1/users", tags=["用户管理"])
 
@@ -49,6 +55,7 @@ async def get_current_user_info(
     db: AsyncSession = Depends(get_db),
 ):
     from app.auth.service import AuthService
+
     return Result(data=await AuthService(db).get_user_info(user.userId))
 
 
@@ -85,8 +92,9 @@ async def change_current_user_password(
 
 @router.post("/mobile/code", summary="发送手机号验证码")
 async def send_mobile_code(mobile: str, user: SysUserDetails = Depends(get_current_user)):
-    # TODO: 接入真实短信服务
-    return Result(data=None)
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=501, detail="短信服务尚未接入")
 
 
 @router.put("/mobile", summary="绑定或更换手机号")
@@ -111,8 +119,9 @@ async def unbind_mobile(
 
 @router.post("/email/code", summary="发送邮箱验证码")
 async def send_email_code(email: str, user: SysUserDetails = Depends(get_current_user)):
-    # TODO: 接入真实邮件服务
-    return Result(data=None)
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=501, detail="邮件服务尚未接入")
 
 
 @router.put("/email", summary="绑定或更换邮箱")
@@ -228,22 +237,28 @@ async def import_users(
 
 # ── 路径参数端点（最后注册）──
 
+
 @router.post("", summary="创建用户", dependencies=[Depends(require_perm("sys:user:create"))])
 async def create_user(
     form: UserCreate,
     db: AsyncSession = Depends(get_db),
     user: SysUserDetails = Depends(get_current_user),
 ):
+    await UserService(db).check_management(user, role_ids=form.roleIds)
     return Result(data=await UserService(db).create(form, user.userId))
 
 
 @router.get("/{user_id}", summary="用户详情", dependencies=[Depends(require_perm("sys:user:detail"))])
-async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user(user_id: int, db: AsyncSession = Depends(get_db), user: SysUserDetails = Depends(get_current_user)):
+    await UserService(db).check_management(user, user_id)
     return Result(data=await UserService(db).get_by_id(user_id))
 
 
 @router.get("/{user_id}/form", summary="用户表单数据", dependencies=[Depends(require_perm("sys:user:update"))])
-async def get_user_form(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user_form(
+    user_id: int, db: AsyncSession = Depends(get_db), user: SysUserDetails = Depends(get_current_user)
+):
+    await UserService(db).check_management(user, user_id)
     return Result(data=await UserService(db).get_user_form(user_id))
 
 
@@ -255,11 +270,16 @@ async def update_user(
     user: SysUserDetails = Depends(get_current_user),
 ):
     form.id = user_id
+    await UserService(db).check_management(user, user_id, form.roleIds)
     return Result(data=await UserService(db).update(form, user.userId))
 
 
 @router.delete("/{ids}", summary="删除用户", dependencies=[Depends(require_perm("sys:user:delete"))])
-async def delete_users(ids: str, db: AsyncSession = Depends(get_db)):
+async def delete_users(ids: str, db: AsyncSession = Depends(get_db), user: SysUserDetails = Depends(get_current_user)):
+    from app.validation import parse_ids
+
+    for user_id in parse_ids(ids):
+        await UserService(db).check_management(user, user_id)
     count = await UserService(db).delete(ids)
     return Result(data=count, msg=f"成功删除 {count} 条记录")
 
@@ -273,11 +293,16 @@ async def update_user_status(
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await UserService(db).check_management(user, user_id)
     await UserService(db).update_status(user_id, status)
     return Result(data=None)
 
 
-@router.put("/{user_id}/password/reset", summary="重置指定用户密码", dependencies=[Depends(require_perm("sys:user:reset-password"))])
+@router.put(
+    "/{user_id}/password/reset",
+    summary="重置指定用户密码",
+    dependencies=[Depends(require_perm("sys:user:reset-password"))],
+)
 @operation_log(module=LogModuleEnum.USER, action_type=ActionTypeEnum.RESET_PASSWORD, title="重置用户密码")
 async def reset_user_password(
     request: Request,
@@ -286,5 +311,6 @@ async def reset_user_password(
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await UserService(db).check_management(user, user_id)
     await UserService(db).reset_password(user_id, form.password)
     return Result(data=None)
