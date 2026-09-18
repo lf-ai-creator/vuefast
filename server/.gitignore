@@ -6,8 +6,11 @@ build/
 .venv/
 .uv/
 .env
+.env.*
 *.egg
 !.env.example
+!.env.sample
+!.env.template
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -16,6 +19,7 @@ build/
 
 # Coverage
 .coverage
+.coverage.*
 htmlcov/
 coverage.xml
 

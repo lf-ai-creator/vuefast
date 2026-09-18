@@ -1,2 +1,65 @@
-# Local IDE settings
-**/.idea/
+# 系统与编辑器临时文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.idea/
+.history/
+*.swp
+*.swo
+*~
+*.suo
+*.user
+
+# Node.js 依赖与缓存（保留 pnpm-lock.yaml）
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/cache/
+.vite/
+.vite-temp/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# 构建与测试产物
+dist/
+dist-ssr/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Python 虚拟环境与工具缓存（保留 uv.lock）
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.uv/
+.coverage
+.coverage.*
+htmlcov/
+
+# 本地环境配置；客户端共享环境配置仍纳入版本控制
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.sample
+!.env.template
+
+# 启停脚本状态、日志与临时文件
+.runtime/
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.tmp
+*.temp

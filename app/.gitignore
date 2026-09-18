@@ -32,7 +32,13 @@ src/types/uni-pages.d.ts
 
 launch.json
 .hbuilderx
-pnpm-lock.yaml
+# 保留 pnpm-lock.yaml，确保依赖安装可复现
+package-lock.json
+yarn.lock
+
+# uni-app / HBuilderX 构建产物
+unpackage/
+.hbuilderx/
 
 
 .vscode
