@@ -24,7 +24,12 @@
           <el-button v-hasPerm="['sys:config:create']" type="primary" @click="openDialog()">
             新增
           </el-button>
-          <el-button v-hasPerm="['sys:config:refresh']" type="warning" @click="refreshCache">
+          <el-button
+            v-hasPerm="['sys:config:refresh']"
+            type="warning"
+            :loading="refreshing"
+            @click="refreshCache"
+          >
             刷新缓存
           </el-button>
         </div>
@@ -54,10 +59,20 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="index" label="序号" width="60" />
-          <el-table-column key="configName" label="配置名称" prop="configName" min-width="100" />
-          <el-table-column key="configKey" label="配置键" prop="configKey" min-width="100" />
-          <el-table-column key="configValue" label="配置值" prop="configValue" min-width="100" />
-          <el-table-column key="remark" label="描述" prop="remark" min-width="100" />
+          <el-table-column
+            label="配置名称"
+            prop="configName"
+            min-width="160"
+            show-overflow-tooltip
+          />
+          <el-table-column label="配置键" prop="configKey" min-width="180" show-overflow-tooltip />
+          <el-table-column
+            label="配置值"
+            prop="configValue"
+            min-width="180"
+            show-overflow-tooltip
+          />
+          <el-table-column label="描述" prop="remark" min-width="180" show-overflow-tooltip />
           <el-table-column fixed="right" label="操作" width="220">
             <template #default="scope">
               <el-button
@@ -127,7 +142,7 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
           <el-button @click="closeDialog">取消</el-button>
         </div>
       </template>
@@ -165,6 +180,8 @@ const { loading, list, total, params, fetchData, handleQuery, handleResetQuery }
 });
 
 const dialogState = reactive({ title: "", visible: false });
+const refreshing = ref(false);
+const submitting = ref(false);
 
 const formData = reactive<ConfigForm>({
   id: undefined,
@@ -188,7 +205,7 @@ function handleSelectionChange(selection: ConfigItem[]): void {
  * 打开新增/编辑系统配置弹窗
  */
 async function openDialog(id?: string): Promise<void> {
-  dialogState.visible = true;
+  resetForm();
   if (id) {
     dialogState.title = "修改系统配置";
     const data = await ConfigAPI.getFormData(id);
@@ -197,22 +214,30 @@ async function openDialog(id?: string): Promise<void> {
     dialogState.title = "新增系统配置";
     formData.id = undefined;
   }
+  dialogState.visible = true;
 }
 
 // 刷新缓存。
-const refreshCache = useDebounceFn(async () => {
-  await ConfigAPI.refreshCache();
-  ElMessage.success("刷新成功");
-}, 1000);
+async function refreshCache(): Promise<void> {
+  if (refreshing.value) return;
+  refreshing.value = true;
+  try {
+    await ConfigAPI.refreshCache();
+    ElMessage.success("配置缓存已刷新");
+  } finally {
+    refreshing.value = false;
+  }
+}
 
 /**
  * 校验并提交系统配置表单
  */
 async function handleSubmit(): Promise<void> {
+  if (submitting.value) return;
   const valid = await dataFormRef.value?.validate().catch(() => false);
   if (!valid) return;
 
-  loading.value = true;
+  submitting.value = true;
   try {
     const id = formData.id;
     if (id) {
@@ -223,9 +248,9 @@ async function handleSubmit(): Promise<void> {
       ElMessage.success("新增成功");
     }
     closeDialog();
-    handleResetQuery();
+    await fetchData();
   } finally {
-    loading.value = false;
+    submitting.value = false;
   }
 }
 
@@ -234,20 +259,33 @@ async function handleSubmit(): Promise<void> {
  */
 function closeDialog(): void {
   dialogState.visible = false;
-  dataFormRef.value?.resetFields();
+  resetForm();
+}
+
+function resetForm(): void {
+  Object.assign(formData, {
+    id: undefined,
+    configName: "",
+    configKey: "",
+    configValue: "",
+    remark: "",
+  });
   dataFormRef.value?.clearValidate();
-  formData.id = undefined;
 }
 
 /**
  * 删除系统配置
  */
 async function handleDelete(id: string): Promise<void> {
-  await ElMessageBox.confirm("确认删除该项配置?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  });
+  try {
+    await ElMessageBox.confirm("确认删除该项配置?", "警告", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
   loading.value = true;
   try {
     await ConfigAPI.deleteById(id);

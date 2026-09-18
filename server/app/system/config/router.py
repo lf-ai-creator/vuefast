@@ -1,7 +1,8 @@
 """系统配置管理。"""
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from datetime import datetime
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,21 +30,21 @@ class ConfigQuery(BaseModel):
 
 
 class ConfigForm(BaseModel):
-    configName: str = Field(..., max_length=50)
-    configKey: str = Field(..., max_length=50)
-    configValue: str = Field(..., max_length=100)
-    remark: str | None = None
-
-
-class ConfigVO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: BigId | None = None
-    configName: str = ""
-    configKey: str = ""
-    configValue: str = ""
-    remark: str | None = None
-    createTime: str | None = None
-    updateTime: str | None = None
-    model_config = {"from_attributes": True}
+    configName: str = Field(..., min_length=1, max_length=50, validation_alias=AliasChoices("configName", "config_name"))
+    configKey: str = Field(..., min_length=1, max_length=50, validation_alias=AliasChoices("configKey", "config_key"))
+    configValue: str = Field(..., min_length=1, max_length=100, validation_alias=AliasChoices("configValue", "config_value"))
+    remark: str | None = Field(default=None, max_length=255)
+
+
+class ConfigVO(ConfigForm):
+    createTime: datetime | None = Field(default=None, validation_alias=AliasChoices("createTime", "create_time"))
+    updateTime: datetime | None = Field(default=None, validation_alias=AliasChoices("updateTime", "update_time"))
+
+    @field_serializer("createTime", "updateTime")
+    def serialize_time(self, value: datetime | None) -> str | None:
+        return value.strftime("%Y-%m-%d %H:%M:%S") if value else None
 
 
 class ConfigService:
@@ -59,14 +60,16 @@ class ConfigService:
         base = select(SysConfig).where(*conditions)
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
         offset = (query.pageNum - 1) * query.pageSize
-        rows = await self.db.execute(select(SysConfig).where(*conditions).offset(offset).limit(query.pageSize))
+        rows = await self.db.execute(
+            select(SysConfig).where(*conditions).order_by(SysConfig.id.desc()).offset(offset).limit(query.pageSize)
+        )
         vo_list = [ConfigVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
         return PageResult(records=vo_list, total=total, pageNum=query.pageNum, pageSize=query.pageSize)
 
     async def get_config_form(self, config_id: int) -> ConfigForm:
         """获取配置编辑表单数据。"""
         obj = await self.db.get(SysConfig, config_id)
-        if obj is None:
+        if obj is None or obj.is_deleted:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="配置不存在")
         return ConfigForm.model_validate(obj, from_attributes=True)
 
@@ -77,7 +80,7 @@ class ConfigService:
 
     async def create(self, form: ConfigForm) -> ConfigVO:
         """创建配置；config_key 重复时返回 B0002。"""
-        exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey, SysConfig.is_deleted == 0))
+        exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey))
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="配置键已存在")
         obj = SysConfig(config_name=form.configName, config_key=form.configKey, config_value=form.configValue, remark=form.remark)
@@ -88,9 +91,9 @@ class ConfigService:
     async def update(self, config_id: int, form: ConfigForm) -> ConfigVO:
         """更新配置；config_key 重复时返回 B0002。"""
         obj = await self.db.get(SysConfig, config_id)
-        if obj is None:
+        if obj is None or obj.is_deleted:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="配置不存在")
-        exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey, SysConfig.is_deleted == 0, SysConfig.id != config_id))
+        exist = await self.db.execute(select(SysConfig.id).where(SysConfig.config_key == form.configKey, SysConfig.id != config_id))
         if exist.scalar() is not None:
             raise BusinessException(code=ResultCode.DUPLICATE_KEY, msg="配置键已存在")
         obj.config_name = form.configName
@@ -98,24 +101,48 @@ class ConfigService:
         obj.config_value = form.configValue
         obj.remark = form.remark
         await self.db.flush()
+        await self.db.refresh(obj)
+        await self.db.refresh(obj)
         return ConfigVO.model_validate(obj, from_attributes=True)
 
     async def delete(self, ids: str) -> int:
         """批量逻辑删除配置（逗号分隔 id）。"""
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
+        try:
+            id_list = list(dict.fromkeys(int(x) for x in ids.split(",") if x.strip()))
+        except ValueError:
+            raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="配置 ID 格式错误")
+        if not id_list:
+            raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="请选择要删除的配置")
+        count = 0
         for cid in id_list:
             obj = await self.db.get(SysConfig, cid)
-            if obj:
+            if obj and not obj.is_deleted:
                 obj.is_deleted = 1
+                count += 1
         await self.db.flush()
-        return len(id_list)
+        return count
 
     async def refresh_cache(self) -> bool:
         """将所有启用配置写入 Redis（key=config:{config_key}），供运行时读取。"""
         redis = await get_redis()
-        rows = await self.db.execute(select(SysConfig.config_key, SysConfig.config_value).where(SysConfig.is_deleted == 0))
-        async for key, value in rows:
-            await redis.set(f"config:{key}", value or "")
+        rows = await self.db.execute(select(SysConfig.config_key, SysConfig.config_value, SysConfig.is_deleted))
+        configs = rows.all()
+        registry = "config:cache:__managed_keys__"
+        previous_keys = {
+            key.decode() if isinstance(key, bytes) else key for key in await redis.smembers(registry)
+        }
+        active = {f"config:{key}": value or "" for key, value, deleted in configs if not deleted}
+        deleted_keys = {f"config:{key}" for key, _, deleted in configs if deleted}
+        stale_keys = (previous_keys | deleted_keys) - active.keys()
+        async with redis.pipeline(transaction=True) as pipeline:
+            if stale_keys:
+                pipeline.delete(*sorted(stale_keys))
+            for key, value in active.items():
+                pipeline.set(key, value)
+            pipeline.delete(registry)
+            if active:
+                pipeline.sadd(registry, *sorted(active))
+            await pipeline.execute()
         logger.info("Config cache refreshed")
         return True
 
@@ -130,7 +157,7 @@ async def get_configs(
     return Result(data=await ConfigService(db).get_page(ConfigQuery(pageNum=pageNum, pageSize=pageSize, keywords=keywords)))
 
 
-@router.get("/{config_id}/form", summary="配置表单数据")
+@router.get("/{config_id}/form", summary="配置表单数据", dependencies=[Depends(require_perm("sys:config:update"))])
 async def get_config_form(config_id: int, db: AsyncSession = Depends(get_db)):
     return Result(data=await ConfigService(db).get_config_form(config_id))
 
@@ -141,12 +168,19 @@ async def get_config_value(config_key: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/refresh", summary="刷新配置缓存", dependencies=[Depends(require_perm("sys:config:refresh"))])
-async def refresh_config_cache(db: AsyncSession = Depends(get_db)):
+@operation_log(module=LogModuleEnum.CONFIG, action_type=ActionTypeEnum.UPDATE, title="刷新配置缓存")
+async def refresh_config_cache(
+    request: Request, user: SysUserDetails = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
     return Result(data=await ConfigService(db).refresh_cache())
 
 
 @router.post("", summary="创建配置", dependencies=[Depends(require_perm("sys:config:create"))])
-async def create_config(form: ConfigForm, db: AsyncSession = Depends(get_db)):
+@operation_log(module=LogModuleEnum.CONFIG, action_type=ActionTypeEnum.INSERT, title="新增配置")
+async def create_config(
+    request: Request, form: ConfigForm,
+    user: SysUserDetails = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
     return Result(data=await ConfigService(db).create(form))
 
 
