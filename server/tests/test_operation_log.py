@@ -10,6 +10,8 @@ from starlette.requests import Request
 from app.response import Result, ResultCode
 from app.system.log.models import SysLog
 from app.system.log.operation_log import operation_log
+from app.system.log.operation_log import resolve_operating_system
+from user_agents import parse
 from app.system.log.router import LogQuery, LogService, LogVO
 
 
@@ -103,3 +105,22 @@ async def test_request_browser_and_os_recorded(monkeypatch, agent, browser, oper
     assert writer.call_args.kwargs["browser"].startswith(browser)
     assert writer.call_args.kwargs["os"].startswith(operating_system)
     assert writer.call_args.kwargs["device"]
+
+
+@pytest.mark.parametrize(
+    "headers,expected",
+    [
+        ({"x-client-platform": "Windows", "x-client-platform-version": "13.0.0"}, "Windows 11"),
+        ({"x-client-platform": "Windows", "x-client-platform-version": "19.0.0"}, "Windows 11"),
+        ({"x-client-platform": "Windows", "x-client-platform-version": "10.0.0"}, "Windows 10"),
+        ({"sec-ch-ua-platform": '"Windows"', "sec-ch-ua-platform-version": '"13.0.0"'}, "Windows 11"),
+        ({"x-client-platform": "macOS", "x-client-platform-version": "15.1.0"}, "macOS 15.1.0"),
+        ({}, "Windows 10/11（版本未确认）"),
+        ({"x-client-platform": "Windows", "x-client-platform-version": "bad"}, "Windows 10/11（版本未确认）"),
+        ({"x-client-platform": "Windows", "x-client-platform-version": "12.0.0"}, "Windows 10/11（版本未确认）"),
+    ],
+)
+def test_platform_hints_correct_os_version(headers, expected):
+    request = Request({"type": "http", "headers": [(key.encode(), value.encode()) for key, value in headers.items()]})
+    agent = parse("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36")
+    assert resolve_operating_system(request, agent) == expected

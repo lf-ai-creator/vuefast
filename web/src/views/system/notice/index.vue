@@ -72,8 +72,14 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="55" align="center" />
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column label="通知标题" prop="title" min-width="200" />
+          <el-table-column type="index" label="序号" width="60" align="center" />
+          <el-table-column
+            label="通知标题"
+            prop="title"
+            min-width="220"
+            header-align="center"
+            show-overflow-tooltip
+          />
           <el-table-column align="center" label="通知类型" width="150">
             <template #default="scope">
               <DictTag v-model="scope.row.type" :code="'notice_type'" />
@@ -85,7 +91,7 @@
               <DictTag v-model="scope.row.level" code="notice_level" />
             </template>
           </el-table-column>
-          <el-table-column align="center" label="通告目标类型" prop="targetType" min-width="100">
+          <el-table-column align="center" label="接收范围" prop="targetType" width="110">
             <template #default="scope">
               <el-tag v-if="scope.row.targetType === NOTICE_TARGET_ALL" type="warning">全体</el-tag>
               <el-tag v-if="scope.row.targetType === NOTICE_TARGET_SPECIFIED" type="success">
@@ -109,27 +115,27 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作时间" width="250">
+          <el-table-column label="操作时间" min-width="245" header-align="center">
             <template #default="scope">
-              <div class="flex-x-start">
-                <span>创建时间：</span>
-                <span>{{ scope.row.createTime || "-" }}</span>
+              <div class="notice-time">
+                <span class="notice-time__label">创建</span>
+                <span>{{ formatNoticeTime(scope.row.createTime) }}</span>
               </div>
 
-              <div v-if="scope.row.publishStatus === NOTICE_STATUS_PUBLISHED" class="flex-x-start">
-                <span>发布时间：</span>
-                <span>{{ scope.row.publishTime || "-" }}</span>
+              <div v-if="scope.row.publishStatus === NOTICE_STATUS_PUBLISHED" class="notice-time">
+                <span class="notice-time__label">发布</span>
+                <span>{{ formatNoticeTime(scope.row.publishTime) }}</span>
               </div>
               <div
                 v-else-if="scope.row.publishStatus === NOTICE_STATUS_REVOKED"
-                class="flex-x-start"
+                class="notice-time"
               >
-                <span>撤回时间：</span>
-                <span>{{ scope.row.revokeTime || "-" }}</span>
+                <span class="notice-time__label">撤回</span>
+                <span>{{ formatNoticeTime(scope.row.revokeTime) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column align="center" fixed="right" label="操作" width="150">
+          <el-table-column align="center" fixed="right" label="操作" width="200">
             <template #default="scope">
               <el-button type="primary" size="small" link @click="openDetailDialog(scope.row.id)">
                 查看
@@ -298,7 +304,7 @@
           {{ currentNotice.publisherName }}
         </el-descriptions-item>
         <el-descriptions-item label="发布时间：">
-          {{ currentNotice.publishTime }}
+          {{ formatNoticeTime(currentNotice.publishTime) }}
         </el-descriptions-item>
         <el-descriptions-item label="公告内容：">
           <div class="notice-content" v-html="currentNotice.content" />
@@ -336,6 +342,14 @@ const NOTICE_STATUS_REVOKED = -1;
 /** 通知目标类型：1=全体，2=指定用户。 */
 const NOTICE_TARGET_ALL = 1;
 const NOTICE_TARGET_SPECIFIED = 2;
+
+function formatNoticeTime(value?: string | Date | null): string {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 
 /** 分页表格数据管理 */
 const { loading, list, total, params, fetchData, handleQuery, handleResetQuery } = usePageTable<
@@ -603,3 +617,20 @@ onMounted(() => {
   handleQuery();
 });
 </script>
+
+<style lang="scss" scoped>
+.notice-time {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  white-space: nowrap;
+
+  &__label {
+    flex-shrink: 0;
+    color: var(--el-text-color-secondary);
+  }
+}
+</style>

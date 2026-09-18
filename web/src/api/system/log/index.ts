@@ -11,6 +11,20 @@ import type { PageResult } from "@/api/common";
 const LOG_BASE_URL = "/api/v1/logs";
 
 const LogAPI = {
+  countHistory(beforeDate: string) {
+    return request<unknown, { count: number }>({
+      url: `${LOG_BASE_URL}/history/count`,
+      method: "get",
+      params: { beforeDate },
+    });
+  },
+  clearHistory(beforeDate: string) {
+    return request<unknown, { deletedCount: number }>({
+      url: `${LOG_BASE_URL}/history`,
+      method: "delete",
+      params: { beforeDate },
+    });
+  },
   /** 获取日志分页列表 */
   getPage(queryParams: LogQueryParams) {
     return request<unknown, PageResult<LogItem>>({

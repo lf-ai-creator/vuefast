@@ -1,7 +1,7 @@
 """操作日志管理。"""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select, cast, String
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, select, cast, String, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field, field_serializer
 import re
@@ -12,11 +12,27 @@ from datetime import date, datetime, time, timedelta
 
 from app.database import get_db
 from app.pagination import PageResult
-from app.dependencies import require_perm
+from app.dependencies import get_current_user, require_perm
+from app.auth.schemas import SysUserDetails
+from app.constants import ROOT_ROLE_CODE
+from app.system.log.operation_log import operation_log
+from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.response import Result
 from app.system.log.models import SysLog
 
 router = APIRouter(prefix="/api/v1/logs", tags=["日志管理"])
+
+
+async def require_log_admin(user: SysUserDetails = Depends(get_current_user)) -> SysUserDetails:
+    if not (user.isRoot or user.roles.intersection({ROOT_ROLE_CODE, "ROOT", "ADMIN"})):
+        raise HTTPException(status_code=403, detail="仅管理员可以清理历史日志")
+    return user
+
+
+def history_cutoff(before_date: date) -> datetime:
+    if before_date > date.today():
+        raise HTTPException(status_code=422, detail="截止日期不能晚于今天")
+    return datetime.combine(before_date, time.min)
 
 
 class LogQuery(BaseModel):
@@ -79,6 +95,15 @@ class VisitOverviewVO(BaseModel):
 class LogService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def count_history(self, before_date: date) -> int:
+        return (await self.db.execute(
+            select(func.count()).select_from(SysLog).where(SysLog.create_time < history_cutoff(before_date))
+        )).scalar() or 0
+
+    async def clear_history(self, before_date: date) -> int:
+        result = await self.db.execute(delete(SysLog).where(SysLog.create_time < history_cutoff(before_date)))
+        return result.rowcount
 
     async def get_page(self, query: LogQuery) -> PageResult:
         conditions = []
@@ -233,3 +258,26 @@ async def get_visit_trend(
 @router.get("/analytics/overview", summary="访问统计概览")
 async def get_visit_overview(db: AsyncSession = Depends(get_db)):
     return Result(data=await LogService(db).get_visit_overview())
+
+
+@router.get("/history/count", summary="预览历史日志清理数量")
+async def count_log_history(
+    beforeDate: date = Query(...),
+    user: SysUserDetails = Depends(require_log_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    return Result(data={"count": await LogService(db).count_history(beforeDate)})
+
+
+@router.delete("/history", summary="管理员清理历史日志")
+@operation_log(module=LogModuleEnum.LOG, action_type=ActionTypeEnum.DELETE, title="清理历史日志")
+async def clear_log_history(
+    request: Request,
+    beforeDate: date = Query(...),
+    user: SysUserDetails = Depends(require_log_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    count = await LogService(db).clear_history(beforeDate)
+    await db.commit()
+    request.state.operation_log_content = f"清理 {beforeDate.isoformat()} 之前的历史日志，共 {count} 条（不含当天）"
+    return Result(data={"deletedCount": count})

@@ -1,7 +1,7 @@
 """通知公告。"""
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -31,17 +31,23 @@ class NoticeQuery(BaseModel):
     pageSize: int = Field(default=10, ge=1, le=100)
     title: str | None = None
     publishStatus: int | None = None
+    isRead: int | None = Field(default=None, ge=0, le=1)
 
 
 class NoticeForm(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: BigId | None = None
     title: str = Field(..., max_length=50)
     content: str = Field(...)
     type: int
     level: str = Field(max_length=5)
-    targetType: int = Field(...)
-    targetUserIds: list | str | None = Field(default=None)
-    publishStatus: int = Field(default=0)
-    status: int | None = Field(default=None)
+    targetType: int = Field(..., ge=1, le=2, validation_alias=AliasChoices("targetType", "target_type"))
+    targetUserIds: list | str | None = Field(
+        default=None, validation_alias=AliasChoices("targetUserIds", "targetUsers", "target_user_ids"),
+        serialization_alias="targetUsers",
+    )
+    publishStatus: int = Field(default=0, validation_alias=AliasChoices("publishStatus", "publish_status"))
+    status: int | None = Field(default=None, validation_alias=AliasChoices("status", "publish_status"))
 
 
 class NoticeVO(BaseModel):
@@ -53,6 +59,7 @@ class NoticeVO(BaseModel):
     targetType: int | None = Field(default=None, validation_alias="target_type")
     targetUserIds: str | None = Field(default=None, validation_alias="target_user_ids")
     publisherId: int | None = Field(default=None, validation_alias="publisher_id")
+    publisherName: str | None = None
     publishStatus: int = Field(default=0, validation_alias="publish_status")
     publishTime: datetime | None = Field(default=None, validation_alias="publish_time")
     revokeTime: datetime | None = Field(default=None, validation_alias="revoke_time")
@@ -93,17 +100,32 @@ class NoticeService:
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
         offset = (query.pageNum - 1) * query.pageSize
         rows = await self.db.execute(
-            select(SysNotice).where(*conditions).order_by(SysNotice.create_time.desc()).offset(offset).limit(query.pageSize)
+            select(SysNotice, SysUser.nickname)
+            .outerjoin(SysUser, SysUser.id == SysNotice.publisher_id)
+            .where(*conditions).order_by(SysNotice.create_time.desc()).offset(offset).limit(query.pageSize)
         )
-        vo_list = [NoticeVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
+        vo_list = [
+            NoticeVO.model_validate(notice).model_copy(update={"publisherName": nickname})
+            for notice, nickname in rows
+        ]
         return PageResult(records=vo_list, total=total, pageNum=query.pageNum, pageSize=query.pageSize)
 
-    async def get_by_id(self, notice_id: int, user_id: int | None = None) -> NoticeVO:
+    async def get_by_id(self, notice_id: int, user_id: int | None = None, is_root: bool = False) -> NoticeVO:
         """通知详情。登录用户查看时同步标记为已读。"""
         obj = await self.db.get(SysNotice, notice_id)
-        if obj is None:
+        if obj is None or obj.is_deleted:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="通知不存在")
         if user_id is not None:
+            recipient = (await self.db.execute(
+                select(SysUserNotice.id).where(
+                    SysUserNotice.notice_id == notice_id, SysUserNotice.user_id == user_id,
+                    SysUserNotice.is_deleted == 0,
+                )
+            )).scalar()
+            if not is_root and user_id not in (obj.create_by, obj.publisher_id) and (
+                obj.publish_status != 1 or recipient is None
+            ):
+                raise BusinessException(code=ResultCode.ACCESS_DENIED, msg="无权查看此通知")
             await self.db.execute(
                 update(SysUserNotice)
                 .where(
@@ -113,7 +135,11 @@ class NoticeService:
                 )
                 .values(is_read=1, read_time=datetime.now())
             )
-        return NoticeVO.model_validate(obj, from_attributes=True)
+        vo = NoticeVO.model_validate(obj, from_attributes=True)
+        if obj.publisher_id:
+            publisher = await self.db.get(SysUser, obj.publisher_id)
+            vo.publisherName = publisher.nickname or publisher.username if publisher else None
+        return vo
 
     async def create(self, form: NoticeForm, create_by: int) -> NoticeVO:
         target_ids = form.targetUserIds
@@ -128,7 +154,7 @@ class NoticeService:
             level=form.level,
             target_type=form.targetType,
             target_user_ids=target_ids,
-            publish_status=form.status if form.status is not None else form.publishStatus,
+            publish_status=0,
             create_by=create_by,
         )
         self.db.add(obj)
@@ -139,6 +165,8 @@ class NoticeService:
         obj = await self.db.get(SysNotice, notice_id)
         if obj is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="通知不存在")
+        if obj.publish_status == 1:
+            raise BusinessException(code=ResultCode.OPERATE_DENIED, msg="请先撤回已发布的通知再编辑")
         target_ids = form.targetUserIds
         if isinstance(target_ids, list):
             target_ids = ",".join(str(x) for x in target_ids)
@@ -150,9 +178,9 @@ class NoticeService:
         obj.level = form.level
         obj.target_type = form.targetType
         obj.target_user_ids = target_ids
-        obj.publish_status = form.status if form.status is not None else form.publishStatus
         obj.update_by = update_by
         await self.db.flush()
+        await self.db.refresh(obj)
         return NoticeVO.model_validate(obj, from_attributes=True)
 
     async def get_notice_form(self, notice_id: int) -> NoticeForm:
@@ -175,8 +203,12 @@ class NoticeService:
         # 按目标类型筛选用户
         if obj.target_type == 2:
             ids = [int(x) for x in (obj.target_user_ids or "").split(",") if x.strip()]
+            if not ids:
+                raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="请选择通知接收用户")
             rows = await self.db.execute(
-                select(SysUser.id, SysUser.username).where(SysUser.id.in_(ids), SysUser.is_deleted == 0)
+                select(SysUser.id, SysUser.username).where(
+                    SysUser.id.in_(ids), SysUser.is_deleted == 0, SysUser.status == 1
+                )
             )
         else:
             rows = await self.db.execute(
@@ -192,6 +224,7 @@ class NoticeService:
             ])
 
         obj.publish_status = 1
+        obj.revoke_time = None
         obj.publish_time = datetime.now()
         obj.publisher_id = publisher_id
         await self.db.flush()
@@ -232,9 +265,16 @@ class NoticeService:
         # 已发布且未删除的通知
         base = (
             select(SysNotice, SysUserNotice.is_read, SysUserNotice.read_time)
-            .join(SysUserNotice, SysUserNotice.notice_id == SysNotice.id, isouter=True)
-            .where(SysNotice.is_deleted == 0, SysNotice.publish_status == 1)
+            .join(SysUserNotice, SysUserNotice.notice_id == SysNotice.id)
+            .where(
+                SysNotice.is_deleted == 0, SysNotice.publish_status == 1,
+                SysUserNotice.user_id == user_id, SysUserNotice.is_deleted == 0,
+            )
         )
+        if query.isRead is not None:
+            base = base.where(SysUserNotice.is_read == query.isRead)
+        if query.title:
+            base = base.where(SysNotice.title.ilike(f"%{query.title}%"))
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
         offset = (query.pageNum - 1) * query.pageSize
         rows = await self.db.execute(
@@ -258,7 +298,8 @@ class NoticeService:
     async def get_unread_count(self, user_id: int) -> int:
         cnt = (await self.db.execute(
             select(func.count()).select_from(SysUserNotice).where(
-                SysUserNotice.user_id == user_id, SysUserNotice.is_read == 0
+                SysUserNotice.user_id == user_id, SysUserNotice.is_read == 0,
+                SysUserNotice.is_deleted == 0,
             )
         )).scalar() or 0
         return cnt
@@ -268,6 +309,7 @@ class NoticeService:
         if obj is None:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="通知不存在")
         obj.is_deleted = 1
+        await self.db.execute(delete(SysUserNotice).where(SysUserNotice.notice_id == notice_id))
         await self.db.flush()
 
 
@@ -287,10 +329,12 @@ async def get_notices(
 async def get_my_notices(
     pageNum: int = Query(default=1, ge=1),
     pageSize: int = Query(default=10, ge=1, le=100),
+    title: str | None = None,
+    isRead: int | None = Query(default=None, ge=0, le=1),
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    q = NoticeQuery(pageNum=pageNum, pageSize=pageSize)
+    q = NoticeQuery(pageNum=pageNum, pageSize=pageSize, title=title, isRead=isRead)
     return Result(data=await NoticeService(db).get_my_page(q, user.userId))
 
 
@@ -303,12 +347,13 @@ async def get_unread_count(
 
 
 @router.get("/{notice_id}", summary="通知详情")
+@router.get("/{notice_id}/detail", summary="通知详情")
 async def get_notice(
     notice_id: int,
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return Result(data=await NoticeService(db).get_by_id(notice_id, user.userId))
+    return Result(data=await NoticeService(db).get_by_id(notice_id, user.userId, user.isRoot))
 
 
 @router.post("", summary="创建通知", dependencies=[Depends(require_perm("sys:notice:create"))])
@@ -320,6 +365,15 @@ async def create_notice(
     db: AsyncSession = Depends(get_db),
 ):
     return Result(data=await NoticeService(db).create(form, user.userId))
+
+
+@router.put("/read-all", summary="全部已读")
+async def read_all(
+    user: SysUserDetails = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await NoticeService(db).read_all(user.userId)
+    return Result(data=None)
 
 
 @router.put("/{notice_id}", summary="更新通知", dependencies=[Depends(require_perm("sys:notice:update"))])
@@ -348,11 +402,15 @@ async def publish_notice(
     db: AsyncSession = Depends(get_db),
 ):
     notice_vo, targets = await NoticeService(db).publish(notice_id, user.userId)
-    # 仅推送给在线的目标用户
-    online = set(await get_online_users())
-    for _uid, uname in targets:
-        if uname in online:
-            await send_to_user(uname, NOTICE, notice_vo)
+    # 提交后再推送，确保接收方立即查询时能读到已发布的数据。
+    await db.commit()
+    try:
+        online = set(await get_online_users())
+        for _uid, uname in targets:
+            if uname in online:
+                await send_to_user(uname, NOTICE, notice_vo)
+    except Exception:
+        logger.exception("通知已发布，但实时推送失败")
     return Result(data=None)
 
 
@@ -365,7 +423,11 @@ async def revoke_notice(
     db: AsyncSession = Depends(get_db),
 ):
     nid = await NoticeService(db).revoke(notice_id)
-    await broadcast(NOTICE_REVOKE, {"id": nid})
+    await db.commit()
+    try:
+        await broadcast(NOTICE_REVOKE, {"id": nid})
+    except Exception:
+        logger.exception("通知已撤回，但实时推送失败")
     return Result(data=None)
 
 
@@ -373,18 +435,14 @@ async def revoke_notice(
 @operation_log(module=LogModuleEnum.NOTICE, action_type=ActionTypeEnum.DELETE, title="删除通知")
 async def delete_notice(
     request: Request,
-    notice_id: int,
+    notice_id: str,
     user: SysUserDetails = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await NoticeService(db).delete(notice_id)
-    return Result(data=None)
-
-
-@router.put("/read-all", summary="全部已读")
-async def read_all(
-    user: SysUserDetails = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    await NoticeService(db).read_all(user.userId)
+    try:
+        notice_ids = [int(value) for value in notice_id.split(",")]
+    except ValueError:
+        raise BusinessException(code=ResultCode.PARAM_VALID_FAIL, msg="通知 ID 格式错误")
+    for item_id in notice_ids:
+        await NoticeService(db).delete(item_id)
     return Result(data=None)

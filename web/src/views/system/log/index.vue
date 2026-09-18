@@ -33,6 +33,9 @@
 
     <el-card ref="tableWrapperRef" class="page-content" shadow="never">
       <div class="page-toolbar">
+        <div v-if="canClearHistory" class="page-toolbar__left">
+          <el-button type="danger" plain @click="cleanupVisible = true">清理历史日志</el-button>
+        </div>
         <div class="page-toolbar__right" style="margin-left: auto">
           <el-tooltip content="刷新" placement="top">
             <el-button class="page-icon-btn" @click="fetchData">
@@ -99,6 +102,41 @@
       />
     </el-card>
 
+    <el-dialog
+      v-model="cleanupVisible"
+      title="清理历史日志"
+      width="460px"
+      :close-on-click-modal="false"
+    >
+      <el-alert
+        title="仅清理截止日期之前的日志，不含当天。删除后无法恢复。"
+        type="warning"
+        :closable="false"
+      />
+      <el-form label-width="90px" class="mt-4">
+        <el-form-item label="截止日期">
+          <el-date-picker
+            v-model="cleanupDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择截止日期"
+            :disabled-date="(value: Date) => value.getTime() > Date.now()"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="cleanupLoading" @click="cleanupVisible = false">取消</el-button>
+        <el-button
+          type="danger"
+          :loading="cleanupLoading"
+          :disabled="!cleanupDate"
+          @click="clearHistory"
+        >
+          清理
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="日志详情" width="720px">
       <el-descriptions :column="2" border>
@@ -139,12 +177,13 @@
 
 <script setup lang="ts">
 import { useFullscreen } from "@vueuse/core";
-import { type FormInstance, type TagProps } from "element-plus";
+import { ElMessage, ElMessageBox, type FormInstance, type TagProps } from "element-plus";
 import { FullScreen, Refresh } from "@element-plus/icons-vue";
 
 import LogAPI from "@/api/system/log";
 import type { LogItem, LogQueryParams } from "@/api/system/log";
 import { usePageTable } from "@/composables";
+import { useUserStore } from "@/stores";
 
 defineOptions({
   name: "Log",
@@ -155,6 +194,43 @@ const tableWrapperRef = ref<HTMLElement | null>(null);
 const { toggle: toggleFullscreen } = useFullscreen(tableWrapperRef);
 
 const queryFormRef = ref<FormInstance>();
+const userStore = useUserStore();
+const canClearHistory = computed(() =>
+  userStore.userInfo.roles?.some((role) => role === "ROOT" || role === "ADMIN")
+);
+const cleanupVisible = ref(false);
+const cleanupDate = ref<string>();
+const cleanupLoading = ref(false);
+
+async function clearHistory(): Promise<void> {
+  const beforeDate = cleanupDate.value;
+  if (!beforeDate || cleanupLoading.value) return;
+  cleanupLoading.value = true;
+  try {
+    const { count } = await LogAPI.countHistory(beforeDate);
+    if (!count) {
+      ElMessage.info("该日期之前没有可清理的日志");
+      return;
+    }
+    try {
+      await ElMessageBox.confirm(
+        `将永久删除 ${beforeDate} 之前的 ${count} 条日志（不含当天），是否继续？`,
+        "确认清理",
+        { type: "warning", confirmButtonText: "确认删除", cancelButtonText: "取消" }
+      );
+    } catch {
+      return;
+    }
+    const { deletedCount } = await LogAPI.clearHistory(beforeDate);
+    ElMessage.success(`已清理 ${deletedCount} 条历史日志`);
+    cleanupVisible.value = false;
+    cleanupDate.value = undefined;
+    params.pageNum = 1;
+    await fetchData();
+  } finally {
+    cleanupLoading.value = false;
+  }
+}
 
 // 日志状态：1=成功，0=失败。
 const LOG_STATUS_SUCCESS = 1;

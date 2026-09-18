@@ -6,6 +6,7 @@ import { useUserStoreHook } from "@/stores/user";
 import { usePermissionStoreHook } from "@/stores/permission";
 import { AuthStorage } from "@/utils/auth";
 import type { ApiResult } from "@/api/common";
+import { getClientPlatform } from "@/utils/client-platform";
 
 // 防止同一请求在 token 刷新后重复进入重试，导致死循环
 const retriedRequests = new WeakSet<InternalAxiosRequestConfig>();
@@ -19,7 +20,12 @@ const http = axios.create({
 });
 
 http.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
+    const platform = await getClientPlatform();
+    if (platform.platform && platform.platformVersion) {
+      config.headers.set("X-Client-Platform", platform.platform);
+      config.headers.set("X-Client-Platform-Version", platform.platformVersion);
+    }
     const token = AuthStorage.getAccessToken();
 
     // 约定：调用方设置 Authorization 为 "no-auth" 即跳过 token 注入

@@ -18,6 +18,25 @@ from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.models import SysLog
 
 
+def resolve_operating_system(request: Request | None, agent) -> str:
+    if request:
+        platform = request.headers.get("sec-ch-ua-platform", "").strip('"') or request.headers.get("x-client-platform", "")
+        version = request.headers.get("sec-ch-ua-platform-version", "").strip('"') or request.headers.get("x-client-platform-version", "")
+        parts = version.split(".")
+        if version and all(part.isdigit() for part in parts) and len(version) < 40:
+            if platform == "Windows":
+                major = int(parts[0])
+                if major >= 13:
+                    return "Windows 11"
+                if 1 <= major <= 10:
+                    return "Windows 10"
+            elif platform in ("macOS", "Android", "iOS", "Chrome OS"):
+                return f"{platform} {version}"
+    if agent.os.family == "Windows" and agent.os.version_string == "10":
+        return "Windows 10/11（版本未确认）"
+    return " ".join(filter(None, (agent.os.family, agent.os.version_string)))
+
+
 async def write_operation_log(
     *,
     module: int = LogModuleEnum.OTHER,
@@ -106,11 +125,12 @@ def operation_log(
                 try:
                     agent = parse(request.headers.get("user-agent", "") if request else "")
                     browser = " ".join(filter(None, (agent.browser.family, agent.browser.version_string)))
-                    operating_system = " ".join(filter(None, (agent.os.family, agent.os.version_string)))
+                    operating_system = resolve_operating_system(request, agent)
                     await write_operation_log(
                         module=module,
                         action_type=action_type,
                         title=title,
+                        content=getattr(request.state, "operation_log_content", "") if request else "",
                         request_method=getattr(request, "method", ""),
                         request_uri=request.url.path[:255] if request else "",
                         status=resp_status,
