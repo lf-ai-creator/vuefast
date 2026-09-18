@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "esnext",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "lib": ["esnext", "dom"],
+    "types": ["@dcloudio/types", "@uni-helper/uni-types"]
+  },
+  "vueCompilerOptions": {
+    // 调整 Volar（Vue 语言服务工具）解析行为，用于为 uni-app 组件提供 TypeScript 类型
+    "plugins": ["@uni-helper/uni-types/volar-plugin"],
+    // 禁用原生组件严格类型检查（uni-app 原生组件与 Volar 的兼容性问题）
+    "nativeTags": ["block", "component", "template", "slot"],
+    // 忽略 slot props 隐式 any 类型错误（递归组件 slot 转发的已知限制）
+    "strictTemplates": false,
+    // Wot UI 的 SFC 模板类型与当前 uni 类型存在兼容问题，脚本类型仍保留检查
+    "skipTemplateCodegen": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "exclude": ["node_modules", "dist"]
+}

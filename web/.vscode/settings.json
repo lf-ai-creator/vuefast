@@ -1,0 +1,62 @@
+{
+  "js/ts.tsdk.path": "./node_modules/typescript/lib",
+  "npm.packageManager": "pnpm",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabCompletion": "off",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "prettier.requireConfig": true,
+  "prettier.useEditorConfig": true,
+  "eslint.format.enable": false,
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  "stylelint.validate": ["css", "scss", "vue"],
+  "[vue]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[scss]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "never",
+    "source.fixAll.eslint": "never",
+    "source.fixAll.stylelint": "never"
+  },
+  "search.exclude": {
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/*.log": true
+  },
+  "files.watcherExclude": {
+    "**/dist/**": true,
+    "**/node_modules/**": true
+  },
+  "i18n-ally.localesPaths": ["src/lang/package"],
+  "i18n-ally.keystyle": "nested",
+  "scss.lint.unknownAtRules": "ignore"
+}

@@ -1,0 +1,169 @@
+@use "./theme";
+
+// 基础样式
+page {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-bg-page);
+}
+
+// H5 端字体平滑渲染
+/* #ifdef H5 */
+html,
+body {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Helvetica,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* #endif */
+
+// 页面容器体系（由 layout 注入，页面模板零标记）：
+// 1. default layout 自动包裹 .page —— 标准内容页：内边距 16rpx/32rpx、画布底色、满屏高
+// 2. tabbar layout 自动包裹 .page.page--tabbar —— tab 页：全出血 + 底部 tabbar 高度补偿
+// 3. blank layout 不包裹 —— 全出血页（登录/扫码确认/webview/监控）在 definePage 声明 layout: "blank"，
+//    页面自行管理背景与高度；状态栏/胶囊避让统一用 custom-navbar 的 placeholder
+// 4. 唯一例外：work 页在 tabbar layout 下需要横向内边距，用工具类包裹（见该页注释）
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 16rpx 32rpx 0;
+  background-color: var(--color-bg-page);
+}
+
+.page--tabbar {
+  padding: 0 0 calc(var(--wot-tabbar-height, 50px) + env(safe-area-inset-bottom));
+}
+
+// 筛选栏
+.filter-bar {
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  margin-top: 16rpx;
+  overflow: hidden;
+  background: var(--color-bg-card);
+  border-radius: 16rpx;
+
+  .wd-drop-menu {
+    flex: 1;
+  }
+
+  .wd-drop-menu-item {
+    flex: 1;
+  }
+}
+
+// 全局 wd-card 间距
+.page .wd-card,
+.filter-bar .wd-card {
+  margin: 0;
+  margin-bottom: 16rpx;
+}
+
+// 弹窗底部按钮
+.popup-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+
+  .wd-button {
+    flex: 1;
+  }
+}
+
+// 底部弹窗圆角
+.popup-bottom {
+  border-radius: 24rpx 24rpx 0 0;
+}
+
+.popup-bottom-scroll {
+  max-height: 80vh;
+  border-radius: 24rpx 24rpx 0 0;
+}
+
+// 弹窗标题
+.popup-title {
+  margin-bottom: 16rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: var(--wot-text-main);
+  text-align: center;
+}
+
+// 列表页悬浮新增按钮（wd-fab 的 trigger 插槽）：纯图标圆形按钮
+.work-fab-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: 50%;
+  box-shadow: var(--shadow-lg);
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.96);
+  }
+}
+
+// 列表卡片右侧圆形图标操作按钮（88rpx 触控热区，配合 hover-class="item-action--hover"）
+.item-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+}
+
+.item-action--hover {
+  background: rgba(var(--color-text-placeholder-rgb), 0.16);
+}
+
+// 列表卡片底部时间戳
+.item-time {
+  font-size: 24rpx;
+  color: var(--color-text-placeholder);
+}
+
+// 语义色工具类：unocss 只生成 bg-/text-/border- 前缀，color-* 系列统一在这里提供
+.color-primary {
+  color: var(--color-primary);
+}
+
+.color-success {
+  color: var(--color-success);
+}
+
+.color-warning {
+  color: var(--color-warning);
+}
+
+.color-danger {
+  color: var(--color-danger);
+}
+
+.color-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.color-text-placeholder {
+  color: var(--color-text-placeholder);
+}
+
+

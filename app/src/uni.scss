@@ -1,0 +1,8 @@
+/**
+ * uni-app 内置样式变量文件（自动注入每个 scss 编译单元）
+ *
+ * 本项目不使用 $uni-* 变量体系：
+ * - 颜色统一走 src/styles/theme.scss 的 CSS 变量（--color-*，支持明暗主题切换）
+ * - 组件库变量由 wd-config-provider 的 --wot-* 变量提供
+ * 如后续引入依赖 $uni-* 变量的三方插件，再在此按需补充。
+ */

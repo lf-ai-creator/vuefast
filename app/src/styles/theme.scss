@@ -1,0 +1,133 @@
+// 明暗主题 CSS 变量，随 wot-design-uni 的 .wot-theme-dark 类切换
+
+// 浅色主题
+:root,
+page {
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-navbar: 700;
+
+  // 组件内分层：底图 0 < 遮罩 1 < 内容 2
+  --z-base: 0;
+  --z-mask: 1;
+  --z-content: 2;
+
+  // 语义色取 Arco 色板基色，-light 为配套的 90% 白浅底
+  --color-primary: #165dff;
+  --color-primary-light: #e8efff;
+  --color-success: #00b42a;
+  --color-success-light: #e6f8ea;
+  --color-warning: #ff7d00;
+  --color-warning-light: #fff2e6;
+  --color-danger: #f53f3f;
+  --color-danger-light: #feecec;
+  --color-info: #86909c;
+  --color-info-light: #f3f4f5;
+  --color-wx-green: #22c55e;
+
+  --color-bg-card: #ffffff;
+  // 页面底（Arco gray-1，带冷调的浅灰）
+  --color-bg-page: #f7f8fa;
+
+  --color-text: #1f2937;
+  --color-text-secondary: #86909c;
+  --color-text-placeholder: #a9aeb8;
+  // 占位色 RGB 分量，供 rgba() 叠加使用（CSS 变量不能直接参与 rgba 计算）
+  --color-text-placeholder-rgb: 169, 174, 184;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-border-glass: rgba(148, 163, 184, 0.22);
+  --color-border-glass-strong: rgba(255, 255, 255, 0.9);
+
+  --color-glass: rgba(255, 255, 255, 0.22);
+  --color-glass-light: rgba(255, 255, 255, 0.12);
+  --color-bg-card-alpha-95: rgba(255, 255, 255, 0.95);
+
+  // 填充（Arco fill 轨道）：卡片内的槽位，独立于页面底
+  --color-fill-1: #f2f3f5;
+  --color-fill-2: #e5e6eb;
+
+  // 底图遮罩：浅色主题提亮底图
+  --color-media-mask: rgba(255, 255, 255, 0.22);
+  --color-media-mask-light: rgba(255, 255, 255, 0.12);
+
+  --color-primary-alpha-20: rgba(22, 93, 255, 0.2);
+  --color-primary-alpha-15: rgba(22, 93, 255, 0.15);
+
+  --shadow-sm: 0 2rpx 4rpx rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8rpx 12rpx rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 20rpx 30rpx rgba(0, 0, 0, 0.1);
+  // 登录卡、扫码卡这类悬浮容器的柔和投影
+  --shadow-float: 0 20rpx 50rpx -10rpx rgba(0, 0, 0, 0.1);
+
+  // 加载/操作遮罩层
+  --color-overlay: rgba(15, 23, 42, 0.6);
+
+  // 仅覆盖主色、按钮圆角、单元格点击态与 fab 层级，其余交给 Wot UI 官方主题
+  --wot-color-theme: var(--color-primary);
+  // wot 按钮默认 4px 圆角偏方，统一到与卡片一致的 24rpx
+  --wot-button-radius-main: 24rpx;
+  // 单元格点击态统一走项目填充色，避免各页面用 :deep 加 !important 硬压
+  --wot-cell-bg-active: var(--color-fill-2);
+  --wot-fab-z-index: 999;
+}
+
+// 暗色主题
+.wot-theme-dark {
+  // 基色与浅色主题一致，-light 转为 90% 深色底
+  --color-primary: #165dff;
+  --color-primary-light: #151c2c;
+  --color-success: #00b42a;
+  --color-success-light: #122417;
+  --color-warning: #ff7d00;
+  --color-warning-light: #2c1f12;
+  --color-danger: #f53f3f;
+  --color-danger-light: #2b1919;
+  --color-info: #86909c;
+  --color-info-light: #202122;
+
+  --color-bg-card: #1f2937;
+  // 深色页面底（gray-900）
+  --color-bg-page: #111827;
+
+  --color-text: #f9fafb;
+  --color-text-secondary: #a9aeb8;
+  --color-text-placeholder: #86909c;
+  // 占位色 RGB 分量，供 rgba() 叠加使用
+  --color-text-placeholder-rgb: 134, 144, 156;
+
+  --color-border: #374151;
+  --color-border-light: #1f2937;
+  --color-border-glass: rgba(148, 163, 184, 0.15);
+
+  --color-glass: rgba(255, 255, 255, 0.12);
+  --color-glass-light: rgba(255, 255, 255, 0.06);
+  --color-bg-card-alpha-95: rgba(31, 41, 55, 0.95);
+
+  // 填充（Arco fill 轨道）：fill-1 沉到页面底，fill-2 为按下态与灰底悬浮
+  --color-fill-1: #111827;
+  --color-fill-2: #1e293b;
+
+  // 底图遮罩：深色主题压暗固定底图，保证图上浅色文字可读
+  // 平铺不渐变：渐变亮带会正好压在描述文字上，导致对比度不足
+  --color-media-mask: rgba(17, 24, 39, 0.82);
+  --color-media-mask-light: rgba(17, 24, 39, 0.82);
+
+  --color-primary-alpha-20: rgba(22, 93, 255, 0.2);
+  --color-primary-alpha-15: rgba(22, 93, 255, 0.15);
+
+  --shadow-sm: 0 2rpx 4rpx rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8rpx 12rpx rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20rpx 30rpx rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 20rpx 50rpx -10rpx rgba(0, 0, 0, 0.4);
+
+  // 加载/操作遮罩层
+  --color-overlay: rgba(0, 0, 0, 0.72);
+
+  --wot-color-theme: var(--color-primary);
+
+  // card / cell / grid / popup 等组件的填充色 --wot-filled-oppo 由 app-provider 内联覆盖，
+  // 写在这里不生效（wot 组件自身样式优先级高于 app.wxss）
+}
