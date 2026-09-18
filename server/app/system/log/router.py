@@ -1,13 +1,14 @@
 """操作日志管理。"""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field, field_serializer
+import re
 
 from app.serializers import BigId
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from app.database import get_db
 from app.pagination import PageResult
@@ -25,6 +26,7 @@ class LogQuery(BaseModel):
     actionType: int | None = None
     keywords: str | None = None
     status: int | None = None
+    createTime: list[date] | None = Field(default=None, min_length=2, max_length=2)
 
 
 class LogVO(BaseModel):
@@ -46,8 +48,17 @@ class LogVO(BaseModel):
     executionTime: int | None = None
     operatorId: BigId | None = None
     operatorName: str | None = None
-    createTime: str | None = None
-    model_config = {"from_attributes": True}
+    createTime: datetime | None = None
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=AliasGenerator(
+            validation_alias=lambda name: AliasChoices(name, re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())
+        ),
+    )
+
+    @field_serializer("createTime")
+    def serialize_create_time(self, value: datetime | None) -> str | None:
+        return value.strftime("%Y-%m-%d %H:%M:%S") if value else None
 
 
 class VisitTrendVO(BaseModel):
@@ -84,6 +95,14 @@ class LogService:
                 | SysLog.operator_name.ilike(kw)
                 | cast(SysLog.ip, String).ilike(kw)
             )
+        if query.createTime:
+            start_date, end_date = query.createTime
+            if start_date > end_date:
+                raise HTTPException(status_code=422, detail="开始日期不能晚于结束日期")
+            conditions.extend([
+                SysLog.create_time >= datetime.combine(start_date, time.min),
+                SysLog.create_time < datetime.combine(end_date + timedelta(days=1), time.min),
+            ])
 
         stmt = select(SysLog)
         if conditions:
@@ -97,23 +116,24 @@ class LogService:
         vo_list = [LogVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
         return PageResult(records=vo_list, total=total, pageNum=query.pageNum, pageSize=query.pageSize)
 
-    async def get_visit_trend(self, start_date: str, end_date: str) -> VisitTrendVO:
-        from datetime import datetime, timedelta
-        s = datetime.strptime(start_date, "%Y-%m-%d").date()
-        e = datetime.strptime(end_date, "%Y-%m-%d").date()
+    async def get_visit_trend(self, start_date: date, end_date: date) -> VisitTrendVO:
+        s = start_date
+        e = end_date
+        if s > e:
+            raise HTTPException(status_code=422, detail="开始日期不能晚于结束日期")
         dates = []
         cur = s
         while cur <= e:
             dates.append(cur.isoformat())
             cur += timedelta(days=1)
 
-        start_dt = f"{dates[0]} 00:00:00"
-        end_dt = f"{dates[-1]} 23:59:59"
+        start_dt = datetime.combine(s, time.min)
+        end_dt = datetime.combine(e + timedelta(days=1), time.min)
 
         # PV counts per date
         pv_rows = await self.db.execute(
             select(func.date(SysLog.create_time), func.count())
-            .where(SysLog.create_time >= start_dt, SysLog.create_time <= end_dt)
+            .where(SysLog.create_time >= start_dt, SysLog.create_time < end_dt)
             .group_by(func.date(SysLog.create_time))
         )
         pv_map = {str(d): c for d, c in pv_rows}
@@ -121,7 +141,7 @@ class LogService:
         # UV counts per date (distinct ip)
         ip_rows = await self.db.execute(
             select(func.date(SysLog.create_time), func.count(func.distinct(SysLog.ip)))
-            .where(SysLog.create_time >= start_dt, SysLog.create_time <= end_dt)
+            .where(SysLog.create_time >= start_dt, SysLog.create_time < end_dt)
             .group_by(func.date(SysLog.create_time))
         )
         uv_map = {str(d): c for d, c in ip_rows}
@@ -133,9 +153,8 @@ class LogService:
         )
 
     async def get_visit_overview(self) -> VisitOverviewVO:
-        from datetime import date
-        today = date.today().isoformat()
-        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        today = date.today()
+        yesterday = today - timedelta(days=1)
 
         # today UV
         r = await self.db.execute(
@@ -168,7 +187,7 @@ class LogService:
         yest_pv = r.scalar() or 0
 
         # total PV
-        r = await self.db.execute(select(func.count()))
+        r = await self.db.execute(select(func.count()).select_from(SysLog))
         total_pv = r.scalar() or 0
 
         uv_rate = round((today_uv - yest_uv) / yest_uv * 100, 2) if yest_uv else 0.0
@@ -192,16 +211,20 @@ async def get_logs(
     actionType: int | None = None,
     status: int | None = None,
     keywords: str | None = None,
+    createTime: list[date] | None = Query(default=None, min_length=2, max_length=2),
     db: AsyncSession = Depends(get_db),
 ):
-    q = LogQuery(pageNum=pageNum, pageSize=pageSize, module=module, actionType=actionType, status=status, keywords=keywords)
+    q = LogQuery(
+        pageNum=pageNum, pageSize=pageSize, module=module, actionType=actionType,
+        status=status, keywords=keywords, createTime=createTime,
+    )
     return Result(data=await LogService(db).get_page(q))
 
 
 @router.get("/analytics/trend", summary="访问趋势统计")
 async def get_visit_trend(
-    startDate: str = Query(..., description="开始时间 yyyy-MM-dd"),
-    endDate: str = Query(..., description="结束时间 yyyy-MM-dd"),
+    startDate: date = Query(..., description="开始时间 yyyy-MM-dd"),
+    endDate: date = Query(..., description="结束时间 yyyy-MM-dd"),
     db: AsyncSession = Depends(get_db),
 ):
     return Result(data=await LogService(db).get_visit_trend(startDate, endDate))

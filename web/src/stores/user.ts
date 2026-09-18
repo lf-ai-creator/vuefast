@@ -88,7 +88,7 @@ export const useUserStore = defineStore("user", () => {
     usePermissionStoreHook().resetRouter();
     useDictStoreHook().clearDictCache();
     useDictStoreHook().teardownDictSync();
-    useTagsViewStore().delAllViews();
+    useTagsViewStore().resetTags();
 
     // 3. 清理 SSE 连接
     cleanupSse();

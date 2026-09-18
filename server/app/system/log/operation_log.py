@@ -10,8 +10,10 @@ from typing import Callable
 
 from fastapi import Request
 from loguru import logger
+from user_agents import parse
 
 from app.database import AsyncSessionLocal
+from app.response import Result, ResultCode
 from app.system.log.constants import ActionTypeEnum, LogModuleEnum
 from app.system.log.models import SysLog
 
@@ -30,6 +32,9 @@ async def write_operation_log(
     operator_id: int | None = None,
     operator_name: str = "",
     ip: str = "",
+    browser: str = "",
+    os: str = "",
+    device: str = "",
 ) -> None:
     """写入一条操作日志到 sys_log 表。
 
@@ -51,6 +56,9 @@ async def write_operation_log(
                 operator_id=operator_id,
                 operator_name=operator_name,
                 ip=ip,
+                browser=browser[:100],
+                os=os[:100],
+                device=device[:100],
             )
             session.add(log_entry)
             await session.commit()
@@ -73,7 +81,7 @@ def operation_log(
     def decorator(func: Callable):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
-            start = time.time()
+            start = time.perf_counter()
             error_msg = ""
             resp_status = 1
 
@@ -82,29 +90,41 @@ def operation_log(
 
             try:
                 result = await func(*args, **kwargs)
+                if isinstance(result, Result) and result.code != ResultCode.SUCCESS:
+                    resp_status = 0
+                    error_msg = result.msg
                 return result
             except Exception as exc:
                 resp_status = 0
                 error_msg = str(exc)
                 raise
             finally:
-                exec_time = int((time.time() - start) * 1000)
+                exec_time = int((time.perf_counter() - start) * 1000)
                 operator_id = getattr(user, "userId", None) if user else None
                 operator_name = getattr(user, "username", "") if user else ""
-                ip = getattr(request, "client", {}).host if request else ""
-                await write_operation_log(
-                    module=module,
-                    action_type=action_type,
-                    title=title,
-                    request_method=getattr(request, "method", ""),
-                    request_uri=str(getattr(request, "url", ""))[:255] if request else "",
-                    status=resp_status,
-                    execution_time=exec_time,
-                    error_msg=error_msg,
-                    operator_id=operator_id,
-                    operator_name=operator_name,
-                    ip=ip,
-                )
+                ip = request.client.host if request and request.client else ""
+                try:
+                    agent = parse(request.headers.get("user-agent", "") if request else "")
+                    browser = " ".join(filter(None, (agent.browser.family, agent.browser.version_string)))
+                    operating_system = " ".join(filter(None, (agent.os.family, agent.os.version_string)))
+                    await write_operation_log(
+                        module=module,
+                        action_type=action_type,
+                        title=title,
+                        request_method=getattr(request, "method", ""),
+                        request_uri=request.url.path[:255] if request else "",
+                        status=resp_status,
+                        execution_time=exec_time,
+                        error_msg=error_msg,
+                        operator_id=operator_id,
+                        operator_name=operator_name,
+                        ip=ip,
+                        browser=browser,
+                        os=operating_system,
+                        device=agent.device.family,
+                    )
+                except Exception:
+                    logger.exception("Operation log failed; business result preserved")
 
         return wrapper
 

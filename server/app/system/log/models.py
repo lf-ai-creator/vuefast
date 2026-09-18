@@ -28,4 +28,6 @@ class SysLog(Base, BaseIdMixin):
     status: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1", comment="0-失败 1-成功")
     error_msg: Mapped[str | None] = mapped_column(String(255), comment="错误信息")
     execution_time: Mapped[int | None] = mapped_column(Integer, comment="执行时间 ms")
-    create_time: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now(), comment="操作时间")
+    create_time: Mapped[datetime | None] = mapped_column(
+        DateTime, default=func.now(), server_default=func.now(), comment="操作时间"
+    )

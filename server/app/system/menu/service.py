@@ -241,8 +241,8 @@ class MenuService:
 
     async def get_routes(self, roles: set[str] = None, is_root: bool = False) -> list[RouteVO]:
         """生成前端动态路由树，按用户角色及状态过滤。"""
-        # B=按钮类型不进入前端路由；仅返回菜单/目录/外链且可见的菜单
-        stmt = select(SysMenu).where(SysMenu.type != "B", SysMenu.visible == 1)
+        # 隐藏菜单仍需注册路由，侧栏显示由 meta.hidden 控制；角色权限过滤保持不变。
+        stmt = select(SysMenu).where(SysMenu.type != "B")
 
         if not is_root:
             if not roles:

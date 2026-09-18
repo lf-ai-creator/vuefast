@@ -472,7 +472,14 @@ function updateVisitTrendChartOptions(d: VisitTrendDetail) {
       itemHeight: 8,
       itemGap: 24,
     },
-    grid: { left: "0%", right: "3%", bottom: "14%", top: "5%", containLabel: true },
+    grid: {
+      left: "0%",
+      right: "3%",
+      bottom: "14%",
+      top: "5%",
+      outerBoundsMode: "same",
+      outerBoundsContain: "axisLabel",
+    },
     xAxis: {
       type: "category",
       data: d.dates,

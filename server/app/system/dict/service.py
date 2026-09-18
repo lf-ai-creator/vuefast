@@ -103,6 +103,22 @@ class DictService:
         )
         return [DictItemVO.model_validate(r, from_attributes=True) for r in rows.scalars().all()]
 
+    async def get_item_page(self, dict_code: str, query: DictQuery) -> PageResult:
+        conditions = [SysDictItem.dict_code == dict_code]
+        if query.keywords:
+            keyword = f"%{query.keywords}%"
+            conditions.append(SysDictItem.label.ilike(keyword) | SysDictItem.value.ilike(keyword))
+        base = select(SysDictItem).where(*conditions)
+        total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+        rows = await self.db.execute(
+            base.order_by(SysDictItem.sort.asc(), SysDictItem.id.asc())
+            .offset((query.pageNum - 1) * query.pageSize).limit(query.pageSize)
+        )
+        return PageResult(
+            records=[DictItemVO.model_validate(item) for item in rows.scalars().all()],
+            total=total, pageNum=query.pageNum, pageSize=query.pageSize,
+        )
+
     async def get_item_options(self, dict_code: str) -> list[DictItemOptionVO]:
         """返回字典项下拉选项（仅启用项）。"""
         rows = await self.db.execute(

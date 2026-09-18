@@ -1,4 +1,6 @@
 import type { LocationQuery } from "vue-router";
+import { useStorage } from "@vueuse/core";
+import { STORAGE_KEYS } from "@/constants";
 import { isExternal } from "@/utils";
 
 export interface TagView {
@@ -22,10 +24,31 @@ export interface DirectionalTagsViewResult {
 }
 
 export const useTagsViewStore = defineStore("tagsView", () => {
-  const visitedViews = ref<TagView[]>([]);
-  const cachedViews = ref<string[]>([]);
+  // 按浏览器页签保存，刷新时恢复顺序、标题及路由参数。
+  const visitedViews = useStorage<TagView[]>(STORAGE_KEYS.VISITED_TAGS, [], sessionStorage, {
+    flush: "sync",
+  });
+  // 仅恢复缓存路由标识；刷新前的组件实例不会被持久化。
+  const cachedViews = ref<string[]>(
+    visitedViews.value.filter((view) => view.keepAlive).map((view) => view.fullPath)
+  );
   const router = useRouter();
   const route = useRoute();
+  const activationHistory = useStorage<string[]>(
+    STORAGE_KEYS.TAG_ACTIVATION_HISTORY,
+    [],
+    sessionStorage,
+    { flush: "sync" }
+  );
+
+  // 关闭单个或批量页签后，移除历史中已不再打开的记录。
+  watch(
+    () => visitedViews.value.map((view) => view.path),
+    (paths) => {
+      activationHistory.value = activationHistory.value.filter((path) => paths.includes(path));
+    },
+    { flush: "sync", immediate: true }
+  );
 
   /**
    * 添加已访问视图到已访问视图列表中
@@ -136,6 +159,12 @@ export const useTagsViewStore = defineStore("tagsView", () => {
   function addView(view: TagView) {
     addVisitedView(view);
     addCachedView(view);
+    if (visitedViews.value.some((tag) => tag.path === view.path) && view.path === route.path) {
+      activationHistory.value = [
+        ...activationHistory.value.filter((path) => path !== view.path),
+        view.path,
+      ];
+    }
   }
 
   function delView(view: TagView): Promise<TagsViewResult> {
@@ -238,6 +267,12 @@ export const useTagsViewStore = defineStore("tagsView", () => {
     });
   }
 
+  function resetTags() {
+    visitedViews.value = [];
+    cachedViews.value = [];
+    activationHistory.value = [];
+  }
+
   /**
    * 关闭当前tagView
    */
@@ -264,7 +299,13 @@ export const useTagsViewStore = defineStore("tagsView", () => {
   }
 
   function toLastView(visitedViews: TagView[], view?: TagView) {
-    const latestView = visitedViews.slice(-1)[0];
+    const previousPath = [...activationHistory.value]
+      .reverse()
+      .find((path) => path !== route.path && visitedViews.some((tag) => tag.path === path));
+    const latestView =
+      visitedViews.find((tag) => tag.path === previousPath) ||
+      visitedViews.find((tag) => tag.affix) ||
+      visitedViews.slice(-1)[0];
     if (latestView && latestView.fullPath) {
       router.push(latestView.fullPath);
     } else {
@@ -301,5 +342,6 @@ export const useTagsViewStore = defineStore("tagsView", () => {
     isActive,
     toLastView,
     updateTagName,
+    resetTags,
   };
 });

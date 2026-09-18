@@ -1,8 +1,19 @@
 """字典管理 Schemas。"""
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field
 
 from app.serializers import BigId
+
+
+class DictSchema(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=AliasGenerator(
+            validation_alias=lambda name: AliasChoices(
+                name, {"dictCode": "dict_code", "tagType": "tag_type"}.get(name, name)
+            )
+        ),
+    )
 
 
 class DictQuery(BaseModel):
@@ -11,14 +22,14 @@ class DictQuery(BaseModel):
     keywords: str | None = None
 
 
-class DictCreate(BaseModel):
+class DictCreate(DictSchema):
     dictCode: str = Field(..., min_length=1, max_length=50, description="类型编码")
     name: str = Field(..., min_length=1, max_length=50, description="类型名称")
     status: int = Field(default=1)
     remark: str | None = None
 
 
-class DictUpdate(BaseModel):
+class DictUpdate(DictSchema):
     id: BigId
     dictCode: str = Field(..., min_length=1, max_length=50)
     name: str = Field(..., min_length=1, max_length=50)
@@ -30,7 +41,7 @@ class DictForm(DictUpdate):
     pass
 
 
-class DictItemCreate(BaseModel):
+class DictItemCreate(DictSchema):
     dictCode: str | None = Field(default=None, description="关联字典编码")
     value: str = Field(..., max_length=50)
     label: str = Field(..., max_length=100)
@@ -40,7 +51,7 @@ class DictItemCreate(BaseModel):
     remark: str | None = None
 
 
-class DictItemUpdate(BaseModel):
+class DictItemUpdate(DictSchema):
     id: BigId
     dictCode: str
     value: str
@@ -55,7 +66,7 @@ class DictItemForm(DictItemUpdate):
     pass
 
 
-class DictVO(BaseModel):
+class DictVO(DictSchema):
     id: BigId | None = None
     dictCode: str = ""
     name: str = ""
@@ -66,7 +77,7 @@ class DictVO(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DictItemVO(BaseModel):
+class DictItemVO(DictSchema):
     id: BigId | None = None
     dictCode: str = ""
     value: str = ""
@@ -78,7 +89,7 @@ class DictItemVO(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DictItemOptionVO(BaseModel):
+class DictItemOptionVO(DictSchema):
     value: str
     label: str
     tagType: str | None = None

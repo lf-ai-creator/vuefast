@@ -40,6 +40,8 @@ export const STORAGE_KEYS = {
   // UI
   SHOW_TAGS_VIEW: `${APP_PREFIX}:ui:show_tags_view`,
   TAGS_VIEW_STYLE: `${APP_PREFIX}:ui:tags_view_style`,
+  VISITED_TAGS: `${APP_PREFIX}:ui:visited_tags`,
+  TAG_ACTIVATION_HISTORY: `${APP_PREFIX}:ui:tag_activation_history`,
   SHOW_APP_LOGO: `${APP_PREFIX}:ui:show_app_logo`,
   SHOW_WATERMARK: `${APP_PREFIX}:ui:show_watermark`,
   PAGE_SWITCHING_ANIMATION: `${APP_PREFIX}:ui:page_switching_animation`,
