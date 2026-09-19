@@ -148,6 +148,7 @@ class AuthService:
         token = await token_manager.generate_token(user_details)
         logger.info(f"User login: {user.username} | roles={roles}")
         return {
+            "userId": user.id,
             "accessToken": token.accessToken,
             "refreshToken": token.refreshToken,
             "tokenType": token.tokenType,

@@ -222,6 +222,8 @@ function handleSettingsClick() {
   }
 
   &__item--search {
+    min-width: 0;
+    padding: 0;
     color: var(--el-text-color-secondary);
 
     &:hover {

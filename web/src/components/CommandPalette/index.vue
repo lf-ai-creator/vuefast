@@ -18,7 +18,8 @@
 
     <el-dialog
       v-model="visible"
-      width="720px"
+      class="command-palette-dialog-shell"
+      width="min(720px, calc(100vw - 32px))"
       :close-on-click-modal="true"
       :show-close="false"
       @close="close"
@@ -49,18 +50,32 @@
         </el-input>
 
         <div class="command-palette-results">
-          <div v-if="displayList.length === 0" class="command-palette-empty">没有搜索历史</div>
+          <div v-if="displayList.length === 0" class="command-palette-empty">
+            <div class="command-palette-empty__icon"><div class="i-svg:search" /></div>
+            <span>没有匹配的菜单</span>
+          </div>
 
           <ul v-else class="command-palette-list">
+            <li class="command-palette-list__label">
+              {{ results.length ? "搜索结果" : "最近访问" }}
+              <span>{{ displayList.length }} 项</span>
+            </li>
             <li
               v-for="(item, idx) in displayList"
               :key="item.path + idx"
               :class="['command-palette-item', { 'is-active': activeIndex === idx }]"
+              :aria-current="activeIndex === idx ? 'true' : undefined"
               @mouseenter="activeIndex = idx"
               @click="onGo(item)"
             >
-              <div class="command-palette-item__title">{{ item.title }}</div>
-              <div class="command-palette-item__path">{{ item.path }}</div>
+              <div class="command-palette-item__main">
+                <div class="command-palette-item__icon"><div class="i-svg:menu" /></div>
+                <div class="command-palette-item__content">
+                  <div class="command-palette-item__title">{{ item.title }}</div>
+                  <div class="command-palette-item__path">{{ item.path }}</div>
+                </div>
+              </div>
+              <div class="command-palette-item__arrow" aria-hidden="true">›</div>
             </li>
           </ul>
         </div>
@@ -144,13 +159,13 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  width: 150px;
+  width: 184px;
   height: 28px;
   padding: 0 8px 0 10px;
   user-select: none;
-  background: var(--el-fill-color-extra-light);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--el-border-color-light) 78%, transparent);
+  border-radius: 7px;
   transition:
     background-color 0.16s,
     border-color 0.16s;
@@ -203,14 +218,35 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
   border-color: var(--el-border-color);
 }
 
+.command-palette-trigger:active {
+  transform: translateY(1px);
+}
+
+:global(.command-palette-dialog-shell .el-dialog__header) {
+  display: none;
+}
+
+:global(.command-palette-dialog-shell .el-dialog__body) {
+  padding: 16px;
+}
+
 .command-palette-dialog {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .command-palette-input :deep(.el-input__wrapper) {
-  border-radius: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 9px;
+  box-shadow:
+    0 0 0 1px var(--el-color-primary-light-7) inset,
+    0 4px 14px rgb(22 93 255 / 8%);
+}
+
+.command-palette-input :deep(.el-input__inner) {
+  font-size: 14px;
 }
 
 .command-palette-input__suffix {
@@ -229,29 +265,104 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 }
 
 .command-palette-results {
-  max-height: 48vh;
+  max-height: min(48vh, 420px);
+  min-height: 72px;
+  padding: 2px;
   overflow: auto;
+  scrollbar-width: thin;
 }
 
 .command-palette-empty {
-  padding: 24px 0;
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  padding: 16px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
   text-align: center;
+}
+
+.command-palette-empty__icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 6px;
+  place-items: center;
+  color: var(--el-text-color-placeholder);
+  background: var(--el-fill-color-light);
+  border-radius: 50%;
+}
+
+.command-palette-empty__icon :deep([class^="i-svg:"]) {
+  font-size: 14px;
 }
 
 .command-palette-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
+.command-palette-list__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--el-text-color-placeholder);
+  text-transform: uppercase;
+}
+
+.command-palette-list__label span {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 .command-palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
   padding: 10px 12px;
   cursor: pointer;
-  border-radius: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition:
+    background-color 0.14s,
+    border-color 0.14s;
+}
+
+.command-palette-item__main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.command-palette-item__icon {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 7px;
+}
+
+.command-palette-item__icon :deep([class^="i-svg:"]) {
+  font-size: 14px;
+}
+
+.command-palette-item__content {
+  min-width: 0;
 }
 
 .command-palette-item:hover {
@@ -260,24 +371,55 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 
 .command-palette-item.is-active {
   background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-8);
 }
 
 .command-palette-item__title {
+  overflow: hidden;
+  font-weight: 500;
   font-size: 14px;
   color: var(--el-text-color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .command-palette-item__path {
+  overflow: hidden;
   margin-top: 2px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-palette-item__arrow {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  place-items: center;
+  color: var(--el-text-color-placeholder);
+  opacity: 0;
+  transition:
+    color 0.14s,
+    opacity 0.14s,
+    transform 0.14s;
+}
+
+.command-palette-item:hover .command-palette-item__arrow,
+.command-palette-item.is-active .command-palette-item__arrow {
+  color: var(--el-color-primary);
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .command-palette-hints {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   align-items: center;
-  padding-top: 10px;
+  padding: 10px 2px 0;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 
@@ -291,11 +433,12 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 24px;
-  padding: 0 8px;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
   background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .command-palette-hint__key :deep([class^="i-svg:"]) {
@@ -306,5 +449,28 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 .command-palette-hint__text {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .command-palette-trigger {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .command-palette-trigger__text,
+  .command-palette-trigger__kbd {
+    display: none;
+  }
+
+  :global(.command-palette-dialog-shell .el-dialog__body) {
+    padding: 12px;
+  }
+
+  .command-palette-hints {
+    gap: 8px 12px;
+  }
 }
 </style>

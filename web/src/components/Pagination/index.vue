@@ -1,18 +1,16 @@
 <template>
-  <el-scrollbar>
-    <div :class="{ 'is-hidden': hidden }" class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :background="background"
-        :layout="layout"
-        :page-sizes="pageSizes"
-        :total="total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-  </el-scrollbar>
+  <div :class="{ 'is-hidden': hidden }" class="pagination-container">
+    <el-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :background="background"
+      :layout="layout"
+      :page-sizes="pageSizes"
+      :total="total"
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -76,11 +74,24 @@ function handleCurrentChange(val: number) {
 .pagination-container {
   display: flex;
   justify-content: flex-end;
-  padding-top: 14px;
-  overflow: visible;
+  min-height: 40px;
+  padding-top: 10px;
+  border-top: 1px solid var(--el-border-color-extra-light);
+
+  :deep(.el-pagination) {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
 
 .pagination-container.is-hidden {
   display: none;
+}
+
+@media (max-width: 768px) {
+  .pagination-container,
+  .pagination-container :deep(.el-pagination) {
+    justify-content: center;
+  }
 }
 </style>

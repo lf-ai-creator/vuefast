@@ -119,8 +119,16 @@ def operation_log(
                 raise
             finally:
                 exec_time = int((time.perf_counter() - start) * 1000)
-                operator_id = getattr(user, "userId", None) if user else None
-                operator_name = getattr(user, "username", "") if user else ""
+                operator_id = (
+                    getattr(user, "userId", None)
+                    if user
+                    else getattr(getattr(request, "state", None), "operation_log_user_id", None)
+                )
+                operator_name = (
+                    getattr(user, "username", "")
+                    if user
+                    else getattr(getattr(request, "state", None), "operation_log_user_name", "")
+                )
                 ip = request.client.host if request and request.client else ""
                 try:
                     agent = parse(request.headers.get("user-agent", "") if request else "")

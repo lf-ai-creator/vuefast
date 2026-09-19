@@ -102,10 +102,17 @@ export interface UserProfileDetail {
   email?: string;
   /** 部门名称 */
   deptName?: string;
-  /** 角色名称 */
-  roleNames?: string;
+  /** 角色名称（接口可能返回数组或逗号分隔字符串） */
+  roleNames?: string | string[];
   /** 创建时间 */
   createTime?: Date;
+}
+
+export interface LoginRecord {
+  device: string;
+  location: string;
+  ip: string;
+  time: string;
 }
 
 /** 个人中心用户信息表单 */
@@ -138,8 +145,8 @@ export interface PasswordVerifyForm {
 export interface MobileUpdateForm {
   /** 手机号 */
   mobile?: string;
-  /** 验证码 */
-  code?: string;
+  /** 短信验证码 */
+  smsCode?: string;
   /** 当前密码 */
   password?: string;
 }
@@ -148,8 +155,8 @@ export interface MobileUpdateForm {
 export interface EmailUpdateForm {
   /** 邮箱 */
   email?: string;
-  /** 验证码 */
-  code?: string;
+  /** 邮箱验证码 */
+  smsCode?: string;
   /** 当前密码 */
   password?: string;
 }

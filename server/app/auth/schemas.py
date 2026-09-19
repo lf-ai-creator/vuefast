@@ -34,6 +34,7 @@ class LoginResult(BaseModel):
     refreshToken: str = ""
     tokenType: str = "Bearer"
     expiresIn: int = 0
+    userId: BigId | None = None
 
 
 class UserInfoVO(BaseModel):

@@ -1,6 +1,6 @@
 """认证路由。"""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,17 +12,22 @@ from app.dependencies import get_current_user, oauth2_scheme
 from app.exceptions import BusinessException
 from app.rate_limit import check_rate_limit
 from app.response import Result, ResultCode
+from app.system.log.constants import ActionTypeEnum, LogModuleEnum
+from app.system.log.operation_log import operation_log
 
 router = APIRouter(prefix="/api/v1/auth", tags=["认证管理"])
 
 
 @router.post("/login", summary="账号密码登录")
-async def login(form: LoginForm, db: AsyncSession = Depends(get_db)):
+@operation_log(module=LogModuleEnum.LOGIN, action_type=ActionTypeEnum.LOGIN, title="用户登录")
+async def login(request: Request, form: LoginForm, db: AsyncSession = Depends(get_db)):
     """用户名 + 密码 + 验证码登录。"""
     if not await CaptchaService().verify(form.captchaId, form.captchaCode):
         raise BusinessException(code=ResultCode.CAPTCHA_ERROR, msg="验证码错误")
 
     result = await AuthService(db).login(form.username, form.password)
+    request.state.operation_log_user_id = result.get("userId")
+    request.state.operation_log_user_name = form.username
     return Result(data=LoginResult(**result))
 
 

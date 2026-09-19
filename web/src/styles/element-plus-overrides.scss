@@ -196,10 +196,6 @@
     transition: background-color var(--el-transition-duration-fast) ease;
   }
 
-  .el-table__body tr:last-child td.el-table__cell {
-    border-bottom-color: transparent;
-  }
-
   .el-table__fixed-right {
     box-shadow: -8px 0 18px -16px rgb(15 23 42 / 35%);
   }
@@ -250,14 +246,25 @@
 .el-pagination {
   --el-pagination-button-height: 28px;
   --el-pagination-button-width: 28px;
-  gap: 5px;
+  gap: 4px;
   font-weight: 400;
+
+  .el-pagination__total,
+  .el-pagination__sizes,
+  .el-pagination__jump {
+    margin-right: 8px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .el-pagination__sizes .el-select__wrapper {
+    min-height: 28px;
+  }
 
   .btn-prev,
   .btn-next,
   .el-pager li {
     border: 1px solid var(--border-color);
-    border-radius: 7px;
+    border-radius: 6px;
     transition:
       color var(--el-transition-duration-fast),
       border-color var(--el-transition-duration-fast),

@@ -15,6 +15,8 @@ from app.exceptions import BusinessException
 from app.pagination import PageResult
 from app.response import ResultCode
 from app.system.dept.models import SysDept
+from app.system.log.constants import ActionTypeEnum, LogModuleEnum
+from app.system.log.models import SysLog
 from app.system.role.data_permission import apply_data_scope
 from app.system.role.models import SysRole
 from app.system.user.constants import DEFAULT_PASSWORD
@@ -245,6 +247,33 @@ class UserService:
     async def get_user_profile(self, user_id: int) -> UserVO:
         """获取个人中心用户信息。"""
         return await self.get_by_id(user_id)
+
+    async def get_login_records(self, user_id: int, limit: int = 3) -> list[dict]:
+        """获取当前用户最近登录记录。"""
+        result = await self.db.execute(
+            select(SysLog)
+            .where(
+                SysLog.operator_id == user_id,
+                SysLog.module == LogModuleEnum.LOGIN,
+                SysLog.action_type == ActionTypeEnum.LOGIN,
+                SysLog.status == 1,
+            )
+            .order_by(SysLog.create_time.desc())
+            .limit(limit)
+        )
+        records = []
+        for item in result.scalars().all():
+            location = " ".join(filter(None, (item.province, item.city))) or "未知位置"
+            device = " / ".join(filter(None, (item.browser, item.os))) or item.device or "未知设备"
+            records.append(
+                {
+                    "device": device,
+                    "location": location,
+                    "ip": item.ip or "-",
+                    "time": item.create_time.strftime("%Y-%m-%d %H:%M:%S") if item.create_time else "",
+                }
+            )
+        return records
 
     async def update_user_profile(self, user_id: int, form) -> UserVO:
         """个人中心修改用户信息。"""

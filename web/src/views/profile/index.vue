@@ -12,6 +12,8 @@
             circle
             :icon="Camera"
             size="small"
+            :loading="avatarLoading"
+            :disabled="avatarLoading"
             title="更换头像"
             @click="triggerFileUpload"
           />
@@ -49,6 +51,9 @@
         <el-button :icon="Edit" @click="handleOpenDialog(DialogType.ACCOUNT)">编辑资料</el-button>
         <el-button type="primary" :icon="Lock" @click="handleOpenDialog(DialogType.PASSWORD)">
           修改密码
+        </el-button>
+        <el-button :icon="Refresh" :loading="profileLoading" @click="loadUserProfile">
+          刷新
         </el-button>
       </div>
     </section>
@@ -155,12 +160,14 @@
           <section class="profile-card">
             <header class="profile-card__header">
               <h3 class="profile-card__title">近期登录</h3>
-              <span class="profile-card__extra">最近 3 条</span>
+              <span class="profile-card__extra">最近 {{ recentLoginRecords.length }} 条</span>
             </header>
 
             <div class="profile-login">
+              <div v-if="loginRecordsLoading" class="profile-empty">正在加载登录记录...</div>
               <div
                 v-for="record in recentLoginRecords"
+                v-else
                 :key="record.time"
                 class="profile-login__item"
               >
@@ -172,6 +179,9 @@
                   <span class="profile-login__meta">{{ record.location }} / {{ record.ip }}</span>
                 </div>
                 <time class="profile-login__time">{{ record.time }}</time>
+              </div>
+              <div v-if="!loginRecordsLoading && !recentLoginRecords.length" class="profile-empty">
+                暂无登录记录
               </div>
             </div>
           </section>
@@ -204,7 +214,12 @@
       </main>
     </div>
 
-    <el-dialog v-model="dialogState.visible" :title="dialogState.title" width="520px">
+    <el-dialog
+      v-model="dialogState.visible"
+      :title="dialogState.title"
+      width="520px"
+      @closed="resetDialogForms"
+    >
       <el-form
         v-if="dialogState.type === DialogType.ACCOUNT"
         ref="userProfileFormRef"
@@ -251,10 +266,14 @@
         <el-form-item label="手机号码" prop="mobile">
           <el-input v-model="mobileUpdateForm.mobile" />
         </el-form-item>
-        <el-form-item label="验证码" prop="code">
-          <el-input v-model="mobileUpdateForm.code">
+        <el-form-item label="验证码" prop="smsCode">
+          <el-input v-model="mobileUpdateForm.smsCode">
             <template #append>
-              <el-button :disabled="mobileCountdown > 0" @click="handleSendMobileCode">
+              <el-button
+                :loading="mobileCodeLoading"
+                :disabled="mobileCountdown > 0 || mobileCodeLoading"
+                @click="handleSendMobileCode"
+              >
                 {{ mobileCountdown > 0 ? mobileCountdown + "s后重新发送" : "发送验证码" }}
               </el-button>
             </template>
@@ -276,10 +295,14 @@
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="emailUpdateForm.email" />
         </el-form-item>
-        <el-form-item label="验证码" prop="code">
-          <el-input v-model="emailUpdateForm.code">
+        <el-form-item label="验证码" prop="smsCode">
+          <el-input v-model="emailUpdateForm.smsCode">
             <template #append>
-              <el-button :disabled="emailCountdown > 0" @click="handleSendEmailCode">
+              <el-button
+                :loading="emailCodeLoading"
+                :disabled="emailCountdown > 0 || emailCodeLoading"
+                @click="handleSendEmailCode"
+              >
                 {{ emailCountdown > 0 ? emailCountdown + "s后重新发送" : "发送验证码" }}
               </el-button>
             </template>
@@ -293,7 +316,7 @@
       <template #footer>
         <span class="inline-flex gap-2">
           <el-button @click="handleCancel">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
         </span>
       </template>
     </el-dialog>
@@ -308,6 +331,7 @@ import type {
   MobileUpdateForm,
   EmailUpdateForm,
   UserProfileForm,
+  LoginRecord,
 } from "@/api/system/user";
 
 import type { Component } from "vue";
@@ -330,6 +354,7 @@ import {
   Message,
   Monitor,
   OfficeBuilding,
+  Refresh,
   Timer,
   User,
   UserFilled,
@@ -363,6 +388,8 @@ interface SecurityItem {
 const userStore = useUserStoreHook();
 
 const userProfile = ref<UserProfileDetail>({});
+const profileLoading = ref(false);
+const avatarLoading = ref(false);
 
 const enum DialogType {
   ACCOUNT = "account",
@@ -389,30 +416,15 @@ const emailUpdateForm = reactive<EmailUpdateForm>({});
 
 const mobileCountdown = ref(0);
 const mobileTimer = ref();
+const mobileCodeLoading = ref(false);
 
 const emailCountdown = ref(0);
 const emailTimer = ref();
+const emailCodeLoading = ref(false);
+const submitLoading = ref(false);
 
-const recentLoginRecords = [
-  {
-    device: "Chrome / Windows",
-    location: "上海",
-    ip: "192.168.1.26",
-    time: "2026-06-20 09:32",
-  },
-  {
-    device: "Edge / Windows",
-    location: "杭州",
-    ip: "192.168.1.18",
-    time: "2026-06-19 18:46",
-  },
-  {
-    device: "Safari / iOS",
-    location: "深圳",
-    ip: "192.168.1.12",
-    time: "2026-06-18 14:08",
-  },
-];
+const recentLoginRecords = ref<LoginRecord[]>([]);
+const loginRecordsLoading = ref(false);
 
 const userProfileRules = {
   nickname: [{ required: true, message: "请输入昵称", trigger: "blur" }],
@@ -420,7 +432,10 @@ const userProfileRules = {
 
 const passwordChangeRules = {
   oldPassword: [{ required: true, message: "请输入原密码", trigger: "blur" }],
-  newPassword: [{ required: true, message: "请输入新密码", trigger: "blur" }],
+  newPassword: [
+    { required: true, message: "请输入新密码", trigger: "blur" },
+    { min: 6, max: 32, message: "密码长度为 6-32 位", trigger: "blur" },
+  ],
   confirmPassword: [
     { required: true, message: "请再次输入新密码", trigger: "blur" },
     {
@@ -446,7 +461,7 @@ const mobileBindingRules = {
       trigger: "blur",
     },
   ],
-  code: [{ required: true, message: "请输入验证码", trigger: "blur" }],
+  smsCode: [{ required: true, message: "请输入验证码", trigger: "blur" }],
   password: [{ required: true, message: "请输入当前密码", trigger: "blur" }],
 };
 
@@ -460,7 +475,7 @@ const emailBindingRules = {
       trigger: "blur",
     },
   ],
-  code: [{ required: true, message: "请输入验证码", trigger: "blur" }],
+  smsCode: [{ required: true, message: "请输入验证码", trigger: "blur" }],
   password: [{ required: true, message: "请输入当前密码", trigger: "blur" }],
 };
 
@@ -477,8 +492,9 @@ const displayName = computed(() => {
 });
 
 const roleList = computed(() => {
-  return (userProfile.value.roleNames || "")
-    .split(/[,，]/)
+  const roleNames = userProfile.value.roleNames;
+  const roles = Array.isArray(roleNames) ? roleNames : (roleNames || "").split(/[,，]/);
+  return roles
     .map((role) => role.trim())
     .filter(Boolean);
 });
@@ -737,13 +753,13 @@ const handleOpenDialog = (type: DialogType) => {
     case DialogType.MOBILE:
       dialogState.title = userProfile.value.mobile ? "更换手机号" : "绑定手机号";
       mobileUpdateForm.mobile = "";
-      mobileUpdateForm.code = "";
+      mobileUpdateForm.smsCode = "";
       mobileUpdateForm.password = "";
       break;
     case DialogType.EMAIL:
       dialogState.title = userProfile.value.email ? "更换邮箱" : "绑定邮箱";
       emailUpdateForm.email = "";
-      emailUpdateForm.code = "";
+      emailUpdateForm.smsCode = "";
       emailUpdateForm.password = "";
       break;
   }
@@ -789,7 +805,7 @@ async function handleUnbindEmail() {
   }
 }
 
-function handleSendMobileCode() {
+async function handleSendMobileCode() {
   if (!mobileUpdateForm.mobile) {
     ElMessage.error("请输入手机号");
     return;
@@ -799,7 +815,9 @@ function handleSendMobileCode() {
     ElMessage.error("手机号格式不正确");
     return;
   }
-  UserAPI.sendMobileCode(mobileUpdateForm.mobile).then(() => {
+  mobileCodeLoading.value = true;
+  try {
+    await UserAPI.sendMobileCode(mobileUpdateForm.mobile);
     ElMessage.success("验证码发送成功");
     mobileCountdown.value = 60;
     mobileTimer.value = setInterval(() => {
@@ -809,10 +827,14 @@ function handleSendMobileCode() {
         clearInterval(mobileTimer.value!);
       }
     }, 1000);
-  });
+  } catch {
+    ElMessage.error("验证码发送失败，请确认短信服务已配置");
+  } finally {
+    mobileCodeLoading.value = false;
+  }
 }
 
-function handleSendEmailCode() {
+async function handleSendEmailCode() {
   if (!emailUpdateForm.email) {
     ElMessage.error("请输入邮箱");
     return;
@@ -823,7 +845,9 @@ function handleSendEmailCode() {
     return;
   }
 
-  UserAPI.sendEmailCode(emailUpdateForm.email).then(() => {
+  emailCodeLoading.value = true;
+  try {
+    await UserAPI.sendEmailCode(emailUpdateForm.email);
     ElMessage.success("验证码发送成功");
     emailCountdown.value = 60;
     emailTimer.value = setInterval(() => {
@@ -833,10 +857,16 @@ function handleSendEmailCode() {
         clearInterval(emailTimer.value!);
       }
     }, 1000);
-  });
+  } catch {
+    ElMessage.error("验证码发送失败，请确认邮件服务已配置");
+  } finally {
+    emailCodeLoading.value = false;
+  }
 }
 
 const handleSubmit = async () => {
+  if (submitLoading.value) return;
+  submitLoading.value = true;
   try {
     if (dialogState.type === DialogType.ACCOUNT) {
       const valid = await userProfileFormRef.value?.validate();
@@ -874,7 +904,9 @@ const handleSubmit = async () => {
       await loadUserProfile();
     }
   } catch {
-    // ignore
+    ElMessage.error("资料保存失败，请稍后重试");
+  } finally {
+    submitLoading.value = false;
   }
 };
 
@@ -891,6 +923,14 @@ const handleCancel = () => {
   }
 };
 
+function resetDialogForms() {
+  userProfileFormRef.value?.resetFields();
+  passwordChangeFormRef.value?.resetFields();
+  mobileBindingFormRef.value?.resetFields();
+  emailBindingFormRef.value?.resetFields();
+  dialogState.type = "" as DialogType;
+}
+
 const fileInput = ref<HTMLInputElement | null>(null);
 
 const triggerFileUpload = () => {
@@ -900,21 +940,51 @@ const triggerFileUpload = () => {
 const handleFileChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files ? target.files[0] : null;
-  if (file) {
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    ElMessage.warning("请选择图片文件");
+    target.value = "";
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning("头像图片不能超过 5MB");
+    target.value = "";
+    return;
+  }
+
+  avatarLoading.value = true;
+  try {
     const data = await FileAPI.uploadFile(file);
-    await UserAPI.updateProfile({
-      avatar: data.url,
-    });
+    await UserAPI.updateProfile({ avatar: data.url });
     userProfile.value.avatar = data.url;
     userStore.userInfo.avatar = data.url;
     ElMessage.success("头像更新成功");
+  } catch {
+    ElMessage.error("头像更新失败，请稍后重试");
+  } finally {
+    avatarLoading.value = false;
+    target.value = "";
   }
-  target.value = "";
 };
 
 const loadUserProfile = async () => {
-  const data = await UserAPI.getProfile();
-  userProfile.value = data;
+  profileLoading.value = true;
+  try {
+    const data = await UserAPI.getProfile();
+    userProfile.value = data;
+  } finally {
+    profileLoading.value = false;
+  }
+};
+
+const loadLoginRecords = async () => {
+  loginRecordsLoading.value = true;
+  try {
+    recentLoginRecords.value = await UserAPI.getLoginRecords();
+  } finally {
+    loginRecordsLoading.value = false;
+  }
 };
 
 onMounted(async () => {
@@ -925,6 +995,7 @@ onMounted(async () => {
     clearInterval(emailTimer.value);
   }
   await loadUserProfile();
+  await loadLoginRecords();
 });
 
 onBeforeUnmount(() => {

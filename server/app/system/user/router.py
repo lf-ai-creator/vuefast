@@ -67,6 +67,14 @@ async def get_user_profile(
     return Result(data=await UserService(db).get_user_profile(user.userId))
 
 
+@router.get("/profile/login-records", summary="获取个人中心近期登录记录")
+async def get_login_records(
+    user: SysUserDetails = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return Result(data=await UserService(db).get_login_records(user.userId))
+
+
 @router.put("/profile", summary="个人中心修改用户信息")
 @operation_log(module=LogModuleEnum.USER, action_type=ActionTypeEnum.UPDATE, title="修改个人资料")
 async def update_user_profile(

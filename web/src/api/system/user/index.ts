@@ -10,6 +10,7 @@ import type {
   PasswordVerifyForm,
   MobileUpdateForm,
   EmailUpdateForm,
+  LoginRecord,
 } from "./types";
 import type { ExcelResult, OptionItem, PageResult } from "@/api/common";
 
@@ -152,6 +153,14 @@ const UserAPI = {
   getProfile() {
     return request<unknown, UserProfileDetail>({
       url: `${USER_BASE_URL}/profile`,
+      method: "get",
+    });
+  },
+
+  /** 获取个人中心近期登录记录 */
+  getLoginRecords() {
+    return request<unknown, LoginRecord[]>({
+      url: `${USER_BASE_URL}/profile/login-records`,
       method: "get",
     });
   },

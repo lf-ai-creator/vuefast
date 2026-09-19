@@ -117,6 +117,15 @@ class UserProfileVO(UserVO):
     pass
 
 
+class LoginRecordVO(BaseModel):
+    """个人中心近期登录记录。"""
+
+    device: str = "未知设备"
+    location: str = "未知位置"
+    ip: str = "-"
+    time: str = ""
+
+
 class CurrentUserVO(UserVO):
     """当前登录用户信息。"""
     pass
