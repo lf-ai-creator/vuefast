@@ -83,9 +83,14 @@ PC 端通过 `/dev-api` 或 `/prod-api` 代理访问后端 API；开发环境默
 
 - 数据库表列表和表结构读取。
 - 基础配置、字段配置和页面类型配置。
-- 代码预览。
-- TypeScript 前端页面/API 及 FastAPI 后端模板生成。
-- 生成文件下载或写入本地（取决于当前运行环境权限）。
+- 页面类型支持「普通」（单文件 Element Plus 页面）与「封装(CURD)」（`PageSearch`/`PageContent`/`PageModal` + `config/*.ts`）。
+- 代码预览与文件类型/范围筛选。
+- TypeScript 前端页面/API 及 FastAPI 后端模板生成；后端复用 `app.database` 的 `BaseIdMixin`、`TimestampMixin`、`SoftDeleteMixin`。
+- 配置了上级菜单时额外生成 `server/sql/<表名>_menu.sql` 菜单初始化脚本（只生成文件，不自动写库）。
+- 生成文件下载 ZIP 或写入本地（取决于当前运行环境权限）。
+
+生成的代码不会自动接入工程：后端需按模块 `__init__.py` 中的说明在 `registry.py` / `main.py` 注册，
+前端页面需执行菜单 SQL 并在「角色管理」中分配权限后才会出现在侧边栏。
 
 ### 示例与基础组件
 

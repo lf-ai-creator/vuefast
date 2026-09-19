@@ -189,7 +189,7 @@ async function handleResetConfig(tableName: string): Promise<void> {
 
 async function handleDownload(tableName: string): Promise<void> {
   try {
-    await GeneratorAPI.download(tableName, "classic", "ts");
+    await GeneratorAPI.download(tableName, "classic");
     ElMessage.success("代码下载成功");
   } catch {
     ElMessage.error("代码下载失败，请先检查代码配置");

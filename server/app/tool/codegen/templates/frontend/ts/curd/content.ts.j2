@@ -1,0 +1,38 @@
+import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+import type { [[ entity_name ]]Item, [[ entity_name ]]QueryParams } from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+import type { IContentConfig } from "@/components/CURD/types";
+
+const contentConfig: IContentConfig<[[ entity_name ]]QueryParams, [[ entity_name ]]Item> = {
+  permPrefix: "[[ perm_prefix ]]",
+  table: {
+    border: true,
+    highlightCurrentRow: true,
+  },
+  pagination: {
+    background: true,
+    layout: "prev,pager,next,jumper,total,sizes",
+    pageSize: 10,
+    pageSizes: [10, 20, 30, 50],
+  },
+  indexAction(params) {
+    return [[ entity_name ]]API.getPage(params);
+  },
+{% if delete_enabled %}  deleteAction: [[ entity_name ]]API.deleteByIds,
+{% endif %}  pk: "id",
+  toolbar: [[ lb ]][[ curd_toolbar ]]],
+  defaultToolbar: ["refresh", "filter", "search"],
+  cols: [
+    { type: "selection", width: 50, align: "center" },
+{% for c in list_columns %}    { label: "[[ c.list_name ]]", align: "center", prop: "[[ c.field_name ]]"{% if c.list_width %}, width: [[ c.list_width ]]{% endif %}{% if c.curd_col_templet == "custom" %}, templet: "custom", slotName: "[[ c.slot_name ]]"{% elif c.curd_col_templet == "date" %}, templet: "date", dateFormat: "[[ c.date_format ]]"{% endif %} },
+{% endfor %}    {
+      label: "操作",
+      align: "center",
+      fixed: "right",
+      width: [[ 80 + (80 if form_enabled else 0) + (80 if delete_enabled and delete_type != "batch" else 0) ]],
+      templet: "tool",
+      operat: [[ lb ]][[ curd_operat ]]],
+    },
+  ],
+};
+
+export default contentConfig;

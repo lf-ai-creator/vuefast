@@ -1,8 +1,74 @@
 # 项目代码审查与修复记录
 
+## 第二轮：代码生成功能专项评审（2026-09-19）
+
+范围：`server/app/tool/codegen/`（服务、模板、路由）、`web/src/views/codegen/` 与 `web/src/api/codegen/`，
+以及生成产物是否符合项目技术栈。评审方式：脱离数据库渲染模板，把产物写入真实工程目录做
+`ruff` / `import` / `vue-tsc` / `eslint` / `stylelint` 验证后清理。
+
+### 已修复问题
+
+| 优先级 | 问题 | 修复结果 |
+| --- | --- | --- |
+| 高 | 生成的 SQLAlchemy 模型重复声明 `create_time` / `update_time` / `is_deleted`，任何含审计列的表导入即 `DuplicateColumnError` | 模型只声明非 Mixin 列；按列是否存在决定挂载 `TimestampMixin` / `SoftDeleteMixin`，无审计列的表不再强行继承 |
+| 高 | 系统列默认被勾选进新增/修改表单，客户端可改写 `is_deleted`、`create_time` | 默认字段配置与 `filter` 统一排除系统列；`Create` / `Update` 不再生成这些字段，表单模板也不再渲染 |
+| 高 | 逻辑删除未生效：列表、详情、更新都不过滤 `is_deleted`，删除后记录仍然可见 | 查询与详情统一追加 `is_deleted == 0`；删除改用 SQLAlchemy `update()`，不再用 f-string 拼 SQL |
+| 高 | 目录命名不符合项目约定：后端包为小驼峰（`server/app/demo/demoOrderInfo`） | 后端包改为下划线目录、Web/App 改为短横线目录，`import` 与前端文件预览路径同步 |
+| 高 | 非超管角色无法保存代码生成配置：路由要求 `sys:codegen:update`，初始菜单只有菜单 201、没有任何按钮权限 | 新增 alembic `20260919_06` 与初始化 SQL 补齐 `sys:codegen:list` / `sys:codegen:update` 并授权管理员角色；列表/预览/下载补上 `list` 权限 |
+| 中 | 查询表单对 `BOOLEAN_SELECT` / `DICT_SELECT` / `SWITCH` / `FILE_UPLOAD` 等类型不生成控件，渲染出空的 `el-form-item` | 查询控件改由后端计算（`query_control`），覆盖全部表单类型；`HIDDEN`、文件类不再进入查询 |
+| 中 | 界面默认值与生成结果不一致：`get_gen_config` 与 `_build_field_meta` 各写一套推断逻辑 | 抽出 `infer_form_type` / `infer_query_type` / `default_field_options`，界面与生成共用同一实现 |
+| 中 | 用户在字段列表选择的 Python 类型、前端类型被忽略或未经校验直接进模板 | 支持并校验 `field_type` / `frontend_type`，模型属性保持列名、Schema 用 `validation_alias` 取值 |
+| 中 | `varchar` 长度与 `numeric` 精度被写死为 `String(255)` / `Numeric(18, 2)` | 读取 `information_schema` 的 `character_maximum_length` / `numeric_precision` / `numeric_scale` 生成真实类型 |
+| 中 | VO 的 `id` 用 `int`，前端按 `string` 处理存在大整数精度风险 | VO 改用 `app.serializers.BigId`，与项目其它模块一致 |
+| 中 | 生成的后端代码不符合项目约定：相对导入、手工拼装 VO、缺少列表权限、分页返回结构不一致 | 改用绝对导入、`VO.model_validate(..., from_attributes=True)`、返回 `PageResult`、补 `:list` 权限、`pageNum`/`pageSize` 与项目一致 |
+| 中 | 可配置的「页面类型 = 封装(CURD)」在后端只校验不渲染，选项形同无效 | 新增 CURD 模板：`PageSearch` / `PageContent` / `PageModal` + `config/{search,content,add,edit}.ts`，按 `pageType` 分发 |
+| 中 | 「上级菜单」保存后不生成任何菜单，界面文案却声称会自动创建 | 新增 `server/sql/<表名>_menu.sql`（DO 块、按权限标识判重、业务名转义），并修正界面文案为「生成脚本 + 手动分配权限」 |
+| 中 | 生成内容可注入：字段描述、业务名、作者未清理即可闭合字符串字面量或注释 | 新增 `sanitize_text`，清理 `"`、换行、`*/`、`${`；表单宽度、字段名、类型枚举全部校验 |
+| 中 | `web/`、`app/` 都是 TypeScript 工程，却仍提供 `type=js` 产物模板 | 移除死模板与 js 分支，`type` 仅接受 `ts`，不合法时返回明确业务错误 |
+| 低 | 必填校验统一 `blur` 触发；`HIDDEN` 渲染 `<el-input type="hidden">`；新增表单复用上次编辑残留 | 按控件类型选择 `blur`/`change` 与提示语；隐藏字段不再进表单；新增/编辑前先重置表单 |
+| 低 | `author` 配置从未使用；下载 ZIP 名固定且由表名直接拼响应头 | 作者写入生成文件头部；ZIP 文件名按表名过滤为 ASCII 安全字符 |
+| 低 | `PreviewQuery` 死代码、`StreamingResponse` 函数内导入、`is_configured` 依赖全表扫描 | 统一使用 `PreviewQuery` 作为查询参数依赖、导入上提；`is_configured` 直接取 `LEFT JOIN` 结果 |
+
+### 新增能力
+
+1. 封装(CURD)页面类型真正可用：生成 `index.vue` + `config/search.ts`、`content.ts`、`add.ts`、`edit.ts`，
+   字典字段自动生成 `DictTag` / `DictSelect` 插槽，`status` 类字段使用「启用/禁用」语义。
+2. 菜单初始化脚本：配置上级菜单后随代码生成 `server/sql/<表名>_menu.sql`（只生成文件，不自动写库）。
+3. 生成模块 `__init__.py` 内含 `registry.py` / `main.py` 接入步骤，避免生成后忘记挂载路由。
+
+### 验证结果
+
+- 后端：`pytest` 154 项通过（新增 `tests/test_codegen.py` 28 项，覆盖模型可导入、系统列不进表单、
+  逻辑删除过滤、字段类型覆盖、CURD/菜单产物、注入清理、LF 换行等回归点）。
+- `ruff check app/tool/codegen tests/test_codegen.py`：无 I001/E501/F401；仅剩项目既有的
+  `B008`（FastAPI `Query(default=...)`）与 `N803`（路径参数 `id`）风格规则。
+- 生成产物端到端验证（写入真实工程后执行，验证完已清理）：
+  - `ruff check app/demo`：0 个 I001/E501，仅 N815/B008/N803，与项目既有代码同类；
+  - 生成模块 `models` / `schemas` / `service` / `router` 全部可导入，`create_app()` 正常；
+  - Web：`pnpm type-check` 通过，ESLint 对生成文件 0 error 0 warning；
+  - App：`pnpm check`（vue-tsc + ESLint + Stylelint）全部通过。
+- 未验证：真实 PostgreSQL 上的元数据读取、CURD 页面与菜单 SQL 的运行时交互、本地写入（File System
+  Access API）真实落盘，这些需要数据库、登录态与浏览器环境。
+
+### 使用变化
+
+1. 生成目录命名调整：后端为 `server/app/<module>/<table_snake>/`，Web 为
+   `web/src/{api,views}/<module>/<table-kebab>/`，App 为 `app/src/api/<table-kebab>.ts` 与
+   `app/src/subPages/work/<table-kebab>/`。
+2. 生成的后端代码不会自动接入工程，请按模块 `__init__.py` 的说明修改 `registry.py` 与 `main.py`。
+3. 需要执行 `alembic upgrade head`（或重跑初始化 SQL）以获得 `sys:codegen:*` 按钮权限，否则非超管
+   角色仍会被拒绝保存配置。
+4. 生成后的前端文件建议执行 `pnpm lint` / `pnpm check` 统一格式；模板已按 Prettier(100) 与
+   ruff(line-length=120) 排版，常规字段下无需再手工调整。
+5. 不再支持 `type=js`：`web/` 与 `app/` 均为 TypeScript 工程。
+
+---
+
+## 第一轮：认证、权限与系统管理评审
+
 审查日期：2026-09-19。范围覆盖 `server/`、`web/`、`app/`，重点检查认证、权限、系统管理接口、字段映射和构建流程。
 
-## 已修复问题
+### 已修复问题
 
 | 优先级 | 问题 | 修复结果 |
 | --- | --- | --- |
@@ -23,7 +89,7 @@
 | 中 | 移动端新检出无法直接类型检查，组件插槽类型不兼容 | 纳入自动导入声明，调整编译器插槽推断，增加依赖锁文件和明确的依赖构建许可。 |
 | 低 | 测试路径过期、错误码字符串转换及无用导入 | 更新真实接口路径，修正转换，清理 Python 静态错误。 |
 
-## 验证结果
+### 验证结果
 
 - 后端：116 项测试全部通过，整体语句覆盖率 61%；新增回归覆盖认证绕过、续期撤销、超管保护、字段映射、部门循环、批量参数和文件归属。
 - Python `ruff check app tests --select F`：通过。
@@ -31,7 +97,7 @@
 - 移动端：`pnpm check` 全部通过；H5 生产构建通过。
 - 本地后端已重启以应用认证及配置修复。
 
-## 使用变化与验证边界
+### 使用变化与验证边界
 
 1. 本地签名密钥已更换，现有会话需要重新登录。其它部署必须设置自己的 `JWT_SECRET_KEY`，不能直接使用空白示例配置。
 2. 短信、邮件及微信验证尚未配置真实服务，对应接口返回 501；账号密码登录保留。恢复这些入口前应实现服务端身份验证、验证码过期与一次性消费。

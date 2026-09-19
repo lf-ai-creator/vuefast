@@ -227,7 +227,7 @@ async function handleDownload() {
   const pageType = props.genConfigFormData.pageType || "classic";
   downloadLoading.value = true;
   try {
-    await GeneratorAPI.download(props.tableName, pageType as "classic" | "curd", "ts");
+    await GeneratorAPI.download(props.tableName, pageType as "classic" | "curd");
     ElMessage.success("代码下载成功");
   } catch {
     ElMessage.error("代码下载失败，请稍后重试");

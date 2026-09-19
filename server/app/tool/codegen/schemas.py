@@ -14,6 +14,8 @@ class TableQuery(BaseModel):
 
 
 class PreviewQuery(BaseModel):
+    """预览/下载参数（当前由路由显式声明，保留类型供内部复用）。"""
+
     page_type: str = Field(default="classic", alias="pageType")
     frontend_type: str = Field(default="ts", alias="type")
 

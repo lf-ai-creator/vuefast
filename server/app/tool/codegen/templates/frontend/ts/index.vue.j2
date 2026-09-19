@@ -2,32 +2,46 @@
   <div class="page-container">
     <el-card class="page-search" shadow="never">
       <el-form ref="queryFormRef" :model="params" :inline="true">
-{% for c in columns %}{% if c.is_show_in_query %}        <el-form-item label="[[ c.query_name ]]" prop="[[ c.field_name ]]">
-{% if c.form_type_name == "INPUT" %}          <el-input v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" clearable @keyup.enter="handleQuery()" />
-{% elif c.form_type_name == "SELECT" %}{% if c.dict_type %}          <DictSelect v-model="params.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
-{% else %}          <el-select v-model="params.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]">
-            <el-option :key="1" :value="1" label="选项一"/>
-            <el-option :key="2" :value="2" label="选项二"/>
+{% for c in query_columns %}        <el-form-item label="[[ c.query_name ]]" prop="[[ c.field_name ]]">
+{% if c.query_control == "input" %}          <el-input v-model="params.[[ c.field_name ]]" placeholder="[[ c.query_name ]]" clearable @keyup.enter="handleQuery()" />
+{% elif c.query_control == "number" %}          <el-input-number v-model="params.[[ c.field_name ]]" placeholder="[[ c.query_name ]]" :controls="false" />
+{% elif c.query_control == "dict-select" %}          <DictSelect v-model="params.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
+{% elif c.query_control == "boolean-select" %}          <el-select v-model="params.[[ c.field_name ]]" placeholder="请选择[[ c.query_name ]]" clearable>
+            <el-option :value="1" label="[[ c.true_label ]]" />
+            <el-option :value="0" label="[[ c.false_label ]]" />
           </el-select>
-{% endif %}{% elif c.form_type_name == "RADIO" %}{% if c.dict_type %}          <DictSelect v-model="params.[[ c.field_name ]]" type="radio" code="[[ c.dict_type ]]" />
-{% else %}          <el-radio-group v-model="params.[[ c.field_name ]]">
-            <el-radio :key="1" :value="1">选项一</el-radio>
-            <el-radio :key="2" :value="2">选项二</el-radio>
+{% elif c.query_control == "select" %}          <el-select v-model="params.[[ c.field_name ]]" placeholder="请选择[[ c.query_name ]]" clearable>
+            <el-option :value="0" label="选项一" />
+            <el-option :value="1" label="选项二" />
+          </el-select>
+{% elif c.query_control == "radio" %}          <el-radio-group v-model="params.[[ c.field_name ]]">
+            <el-radio :value="0">选项一</el-radio>
+            <el-radio :value="1">选项二</el-radio>
           </el-radio-group>
-{% endif %}{% elif c.form_type_name == "CHECK_BOX" %}{% if c.dict_type %}          <DictSelect v-model="params.[[ c.field_name ]]" type="checkbox" code="[[ c.dict_type ]]" />
-{% else %}          <el-checkbox-group v-model="params.[[ c.field_name ]]">
-            <el-checkbox :key="1" :label="1">选项一</el-checkbox>
-            <el-checkbox :key="2" :label="2">选项二</el-checkbox>
+{% elif c.query_control == "checkbox" %}          <el-checkbox-group v-model="params.[[ c.field_name ]]">
+            <el-checkbox :value="0">选项一</el-checkbox>
+            <el-checkbox :value="1">选项二</el-checkbox>
           </el-checkbox-group>
-{% endif %}{% elif c.form_type_name == "INPUT_NUMBER" %}          <el-input-number v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "SWITCH" %}          <el-switch v-model="params.[[ c.field_name ]]" :active-value="1" :inactive-value="0" />
-{% elif c.form_type_name == "TEXT_AREA" %}          <el-input type="textarea" v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "DATE_TIME" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="daterange" range-separator="~" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm" />
-{% else %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm" />
-{% endif %}{% elif c.form_type_name == "DATE" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker class="!w-[240px]" v-model="params.[[ c.field_name ]]" type="daterange" range-separator="~" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD" />
-{% else %}          <el-date-picker class="!w-[240px]" v-model="params.[[ c.field_name ]]" type="date" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD" />
+{% elif c.query_control == "datetime" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker
+            v-model="params.[[ c.field_name ]]"
+            type="datetimerange"
+            range-separator="~"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="[[ c.date_format ]]"
+          />
+{% else %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="datetime" placeholder="请选择[[ c.query_name ]]" value-format="[[ c.date_format ]]" />
+{% endif %}{% elif c.query_control == "date" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker
+            v-model="params.[[ c.field_name ]]"
+            type="daterange"
+            range-separator="~"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="[[ c.date_format ]]"
+          />
+{% else %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="date" placeholder="请选择[[ c.query_name ]]" value-format="[[ c.date_format ]]" />
 {% endif %}{% endif %}        </el-form-item>
-{% endif %}{% endfor %}        <el-form-item>
+{% endfor %}        <el-form-item>
           <el-button type="primary" @click="handleQuery">搜索</el-button>
           <el-button @click="handleResetQuery">重置</el-button>
         </el-form-item>
@@ -37,84 +51,118 @@
     <el-card ref="tableWrapperRef" class="page-content" shadow="never">
       <div class="page-toolbar">
         <div class="page-toolbar__left">
-{% if form_enabled %}          <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:create']" type="primary" @click="handleCreateClick()">新增</el-button>
-{% endif %}
-{% if delete_enabled and delete_type in ("single_batch", "batch") %}          <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" :disabled="!hasSelection" @click="handleBatchDelete()">删除</el-button>
-{% endif %}
-        </div>
+{% if form_enabled %}          <el-button v-hasPerm="'[[ perm_prefix ]]:create'" type="primary" @click="handleCreateClick()">
+            新增
+          </el-button>
+{% endif %}{% if delete_enabled and delete_type in ("single_batch", "batch") %}          <el-button
+            v-hasPerm="'[[ perm_prefix ]]:delete'"
+            type="danger"
+            :disabled="!hasSelection"
+            @click="handleDelete()"
+          >
+            删除
+          </el-button>
+{% endif %}        </div>
         <div class="page-toolbar__right">
           <el-tooltip content="刷新" placement="top">
-            <el-button class="page-icon-btn" @click="fetchData"><el-icon><Refresh /></el-icon></el-button>
+            <el-button class="page-icon-btn" @click="fetchData">
+              <el-icon><Refresh /></el-icon>
+            </el-button>
           </el-tooltip>
           <el-tooltip content="全屏" placement="top">
-            <el-button class="page-icon-btn" @click="toggleFullscreen"><el-icon><FullScreen /></el-icon></el-button>
+            <el-button class="page-icon-btn" @click="toggleFullscreen">
+              <el-icon><FullScreen /></el-icon>
+            </el-button>
           </el-tooltip>
         </div>
       </div>
 
       <div class="page-table-wrapper">
-        <el-table ref="dataTableRef" v-loading="loading" class="page-table" :data="list" height="100%" border highlight-current-row @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-{% for c in columns %}{% if c.is_show_in_list %}{% if c.dict_type %}        <el-table-column label="[[ c.list_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %}>
-          <template #default="scope">
-            <DictTag v-model="scope.row.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
-          </template>
-        </el-table-column>
-{% elif c.form_type_name in ("DATE", "DATE_TIME") %}        <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="170"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} :formatter="(row, column, cellValue) => formatDateTime(cellValue)" />
-{% else %}        <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} />
-{% endif %}{% endif %}{% endfor %}        <el-table-column fixed="right" label="操作" width="180">
-          <template #default="scope">
-{% if form_enabled %}            <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:update']" type="primary" size="small" link @click="handleEditClick(String(scope.row.id))">编辑</el-button>
-{% endif %}
-{% if delete_enabled and delete_type in ("single_batch", "single") %}            <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" size="small" link @click="handleDelete(String(scope.row.id))">删除</el-button>
-{% endif %}
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table
+          v-loading="loading"
+          class="page-table"
+          :data="list"
+          height="100%"
+          border
+          highlight-current-row
+          @selection-change="handleSelectionChange"
+        >
+          <el-table-column type="selection" width="55" align="center" />
+{% for c in list_columns %}{% if c.curd_col_templet == "custom" %}          <el-table-column label="[[ c.list_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %}>
+            <template #default="scope">
+              <DictTag v-model="scope.row.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
+            </template>
+          </el-table-column>
+{% elif c.curd_col_templet == "date" %}          <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="170"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} :formatter="(row, column, cellValue) => formatDateTime(cellValue)" />
+{% else %}          <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} />
+{% endif %}{% endfor %}          <el-table-column fixed="right" label="操作" align="center" width="180">
+            <template #default="scope">
+{% if form_enabled %}              <el-button
+                v-hasPerm="'[[ perm_prefix ]]:update'"
+                type="primary"
+                size="small"
+                link
+                @click="handleEditClick(String(scope.row.id))"
+              >
+                编辑
+              </el-button>
+{% endif %}{% if delete_enabled and delete_type in ("single_batch", "single") %}              <el-button
+                v-hasPerm="'[[ perm_prefix ]]:delete'"
+                type="danger"
+                size="small"
+                link
+                @click="handleDelete(String(scope.row.id))"
+              >
+                删除
+              </el-button>
+{% endif %}            </template>
+          </el-table-column>
+        </el-table>
       </div>
 
-      <pagination v-if="total > 0" v-model:total="total" v-model:page="params.pageNum" v-model:limit="params.pageSize" class="page-pagination" @pagination="fetchData" />
+      <pagination
+        v-if="total > 0"
+        v-model:total="total"
+        v-model:page="params.pageNum"
+        v-model:limit="params.pageSize"
+        @pagination="fetchData"
+      />
     </el-card>
+{% if form_enabled %}
 
-{% if form_enabled %}{% if form_layout == "drawer" %}    <el-drawer v-model="dialog.visible" :title="dialog.title" size="[[ form_width ]]" @close="closeDialog">
+{% if form_layout == "drawer" %}    <el-drawer v-model="dialog.visible" :title="dialog.title" size="[[ form_width ]]" @close="closeDialog">
 {% else %}    <el-dialog v-model="dialog.visible" :title="dialog.title" width="[[ form_width ]]" @close="closeDialog">
-{% endif %}
-      <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
+{% endif %}      <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
         <el-row :gutter="18">
-{% for c in columns %}{% if (c.is_show_in_create or c.is_show_in_update) and c.form_type_name != "HIDDEN" %}          <el-col :span="[[ form_span ]]" v-if="{% if c.is_show_in_create and c.is_show_in_update %}true{% elif c.is_show_in_create %}!formData.id{% else %}!!formData.id{% endif %}">
+{% for c in form_columns_config %}          <el-col v-if="{% if c.is_show_in_create and c.is_show_in_update %}true{% elif c.is_show_in_create %}!formData.id{% else %}!!formData.id{% endif %}" :span="[[ form_span ]]">
             <el-form-item label="[[ c.field_comment ]]" prop="[[ c.field_name ]]">
-{% if c.form_type_name == "INPUT" %}          <el-input v-model="formData.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "SELECT" %}{% if c.dict_type %}          <DictSelect v-model="formData.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
-{% else %}          <el-select v-model="formData.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]">
-            <el-option :value="0" label="选项一"/>
-            <el-option :value="1" label="选项二"/>
-          </el-select>
-{% endif %}{% elif c.form_type_name == "RADIO" %}{% if c.dict_type %}          <DictSelect v-model="formData.[[ c.field_name ]]" type="radio" code="[[ c.dict_type ]]" />
-{% else %}          <el-radio-group v-model="formData.[[ c.field_name ]]">
-            <el-radio :value="0">选项一</el-radio>
-            <el-radio :value="1">选项二</el-radio>
-          </el-radio-group>
-{% endif %}{% elif c.form_type_name == "CHECK_BOX" %}{% if c.dict_type %}          <DictSelect v-model="formData.[[ c.field_name ]]" type="checkbox" code="[[ c.dict_type ]]" />
-{% else %}          <el-checkbox-group v-model="formData.[[ c.field_name ]]">
-            <el-checkbox :value="0">选项一</el-checkbox>
-            <el-checkbox :value="1">选项二</el-checkbox>
-          </el-checkbox-group>
-{% endif %}{% elif c.form_type_name == "INPUT_NUMBER" %}          <el-input-number v-model="formData.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "BOOLEAN_SELECT" %}          <el-select v-model="formData.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]">
-            <el-option :value="1" label="是" />
-            <el-option :value="0" label="否" />
-          </el-select>
-{% elif c.form_type_name == "DICT_SELECT" %}{% if c.dict_type %}          <DictSelect v-model="formData.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
-{% else %}          <el-select v-model="formData.[[ c.field_name ]]" placeholder="请先配置字典" />
-{% endif %}{% elif c.form_type_name == "FILE_UPLOAD" %}          <FileUpload v-model="formData.[[ c.field_name ]]" />
-{% elif c.form_type_name == "SWITCH" %}          <el-switch v-model="formData.[[ c.field_name ]]" :active-value="1" :inactive-value="0" />
-{% elif c.form_type_name == "TEXT_AREA" %}          <el-input type="textarea" v-model="formData.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "DATE_TIME" %}          <el-date-picker v-model="formData.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm" />
-{% elif c.form_type_name == "DATE" %}          <el-date-picker class="!w-[240px]" v-model="formData.[[ c.field_name ]]" type="date" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD" />
+{% if c.form_control == "input" %}              <el-input v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment ]]" clearable />
+{% elif c.form_control == "textarea" %}              <el-input v-model="formData.[[ c.field_name ]]" type="textarea" placeholder="请输入[[ c.field_comment ]]" />
+{% elif c.form_control == "number" %}              <el-input-number v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment ]]" class="!w-full" />
+{% elif c.form_control == "dict-select" %}              <DictSelect v-model="formData.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
+{% elif c.form_control == "boolean-select" %}              <el-select v-model="formData.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]" clearable>
+                <el-option :value="1" label="[[ c.true_label ]]" />
+                <el-option :value="0" label="[[ c.false_label ]]" />
+              </el-select>
+{% elif c.form_control == "switch" %}              <el-switch v-model="formData.[[ c.field_name ]]" :active-value="1" :inactive-value="0" />
+{% elif c.form_control == "select" %}              <el-select v-model="formData.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]" clearable>
+                <el-option :value="0" label="选项一" />
+                <el-option :value="1" label="选项二" />
+              </el-select>
+{% elif c.form_control == "radio" %}              <el-radio-group v-model="formData.[[ c.field_name ]]">
+                <el-radio :value="0">选项一</el-radio>
+                <el-radio :value="1">选项二</el-radio>
+              </el-radio-group>
+{% elif c.form_control == "checkbox" %}              <el-checkbox-group v-model="formData.[[ c.field_name ]]">
+                <el-checkbox :value="0">选项一</el-checkbox>
+                <el-checkbox :value="1">选项二</el-checkbox>
+              </el-checkbox-group>
+{% elif c.form_control == "file" %}              <FileUpload v-model="formData.[[ c.field_name ]]" />
+{% elif c.form_control == "date" %}              <el-date-picker v-model="formData.[[ c.field_name ]]" type="date" placeholder="请选择[[ c.field_comment ]]" value-format="[[ c.date_format ]]" />
+{% elif c.form_control == "datetime" %}              <el-date-picker v-model="formData.[[ c.field_name ]]" type="datetime" placeholder="请选择[[ c.field_comment ]]" value-format="[[ c.date_format ]]" />
 {% endif %}            </el-form-item>
           </el-col>
-{% elif c.form_type_name == "HIDDEN" %}          <el-input type="hidden" v-model="formData.[[ c.field_name ]]" />
-{% endif %}{% endfor %}        </el-row>
+{% endfor %}        </el-row>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -124,8 +172,7 @@
       </template>
 {% if form_layout == "drawer" %}    </el-drawer>
 {% else %}    </el-dialog>
-{% endif %}{% endif %}
-  </div>
+{% endif %}{% endif %}  </div>
 </template>
 
 <script setup lang="ts">
@@ -133,9 +180,13 @@ import { useFullscreen } from "@vueuse/core";
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { FullScreen, Refresh } from "@element-plus/icons-vue";
 import { usePageTable, useTableSelection } from "@/composables";
-import { formatDateTime } from "@/utils/format";
-import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
-import type { [[ entity_name ]]Item, [[ entity_name ]]Form, [[ entity_name ]]QueryParams } from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+{% if has_list_date %}import { formatDateTime } from "@/utils/format";
+{% endif %}import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+import type {
+  [[ entity_name ]]Form,
+  [[ entity_name ]]Item,
+  [[ entity_name ]]QueryParams,
+} from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
 
 defineOptions({
   name: "[[ entity_name ]]",
@@ -147,8 +198,7 @@ const dataFormRef = ref<FormInstance>();
 const tableWrapperRef = ref<HTMLElement | null>(null);
 const { toggle: toggleFullscreen } = useFullscreen(tableWrapperRef);
 
-const initialFormData = reactive({ id: undefined } as [[ entity_name ]]Form);
-Object.assign(initialFormData, {} as [[ entity_name ]]Form);
+const initialFormData = { id: undefined } as [[ entity_name ]]Form;
 
 const { loading, list, total, params, fetchData, handleQuery, handleResetQuery } = usePageTable<
   [[ entity_name ]]Item,
@@ -169,29 +219,41 @@ const dialog = reactive({
   visible: false,
 });
 
-const formData = reactive<[[ entity_name ]]Form>({ id: undefined } as [[ entity_name ]]Form);
+const formData = reactive<[[ entity_name ]]Form>({ ...initialFormData });
 
 const rules: FormRules = {
-{% for c in columns %}{% if (c.is_show_in_create or c.is_show_in_update) and c.is_required %}  [[ c.field_name ]]: [{ required: true, message: "请输入[[ c.field_comment ]]", trigger: "blur" }],
-{% endif %}{% endfor %}
-};
+{% for c in form_columns_config %}{% if c.is_required %}  [[ c.field_name ]]: [
+    { required: true, message: "[[ c.required_action ]][[ c.field_comment ]]", trigger: "[[ c.required_trigger ]]" },
+  ],
+{% endif %}{% endfor %}};
 
-function openDialog(): void { dialog.visible = true; }
-function closeDialog(): void { dialog.visible = false; resetForm(); }
-
+/** 重置表单数据与校验状态，保持响应式对象引用不变 */
 function resetForm(): void {
   dataFormRef.value?.resetFields();
   dataFormRef.value?.clearValidate();
-  Object.keys(formData).forEach((key) => { delete (formData as Record<string, unknown>)[key]; });
+  Object.keys(formData).forEach((key) => {
+    delete (formData as Record<string, unknown>)[key];
+  });
   Object.assign(formData, initialFormData);
 }
 
-async function handleCreateClick(): Promise<void> {
+function openDialog(): void {
+  dialog.visible = true;
+}
+
+function closeDialog(): void {
+  dialog.visible = false;
+  resetForm();
+}
+
+function handleCreateClick(): void {
+  resetForm();
   dialog.title = "新增[[ business_name ]]";
   openDialog();
 }
 
 async function handleEditClick(id: string): Promise<void> {
+  resetForm();
   dialog.title = "修改[[ business_name ]]";
   const data = await [[ entity_name ]]API.getFormData(id);
   Object.assign(formData, data);
@@ -199,12 +261,17 @@ async function handleEditClick(id: string): Promise<void> {
 }
 
 async function handleSubmit(): Promise<void> {
-  const valid = await dataFormRef.value?.validate().then(() => true, () => false);
+  const valid = await dataFormRef.value?.validate().then(
+    () => true,
+    () => false
+  );
   if (!valid) return;
+
   loading.value = true;
   try {
-    if (formData.id) {
-      await [[ entity_name ]]API.update(formData.id, formData);
+    const id = formData.id;
+    if (id) {
+      await [[ entity_name ]]API.update(id, formData);
       ElMessage.success("修改成功");
     } else {
       await [[ entity_name ]]API.create(formData);
@@ -216,18 +283,31 @@ async function handleSubmit(): Promise<void> {
     loading.value = false;
   }
 }
+{% if delete_enabled %}
 
-function handleBatchDelete(): void { handleDelete(); }
-
+/**
+ * 删除单个或批量[[ business_name ]]
+ *
+ * @param id 传入时删除单条，否则删除表格勾选项
+ */
 async function handleDelete(id?: string): Promise<void> {
-  const ids = id || selectedIds.value.join(",");
-  if (!ids) { ElMessage.warning("请勾选删除项"); return; }
+  const ids = id ?? selectedIds.value.join(",");
+  if (!ids) {
+    ElMessage.warning("请勾选删除项");
+    return;
+  }
+
   try {
-    await ElMessageBox.confirm("确认删除已选中的数据项?", "警告", { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" });
+    await ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
   } catch {
     ElMessage.info("已取消删除");
     return;
   }
+
   loading.value = true;
   try {
     await [[ entity_name ]]API.deleteByIds(ids);
@@ -237,6 +317,9 @@ async function handleDelete(id?: string): Promise<void> {
     loading.value = false;
   }
 }
+{% endif %}
 
-onMounted(() => { handleQuery(); });
+onMounted(() => {
+  handleQuery();
+});
 </script>

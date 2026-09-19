@@ -34,7 +34,7 @@ export function useCodePreview(genConfigFormData: Ref<GenConfigForm>) {
   async function handlePreview(tableName: string) {
     treeData.value = [];
     const pageType = genConfigFormData.value.pageType || "classic";
-    const data = await GeneratorAPI.getPreviewData(tableName, pageType as "classic" | "curd", "ts");
+    const data = await GeneratorAPI.getPreviewData(tableName, pageType as "classic" | "curd");
     const previewList = data || [];
 
     // 提取语言类型选项

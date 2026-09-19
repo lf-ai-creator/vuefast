@@ -5,15 +5,8 @@ import type { PageResult } from "@/api/common";
 const GENERATOR_BASE_URL = "/api/v1/codegen";
 
 // 构建预览和下载接口的查询参数
-const buildCodegenParams = (pageType?: "classic" | "curd", type?: "ts" | "js") => {
-  const params: Record<string, string> = {};
-  if (pageType) {
-    params.pageType = pageType;
-  }
-  if (type) {
-    params.type = type;
-  }
-  return Object.keys(params).length ? params : undefined;
+const buildCodegenParams = (pageType?: "classic" | "curd") => {
+  return pageType ? { pageType } : undefined;
 };
 
 const GeneratorAPI = {
@@ -44,11 +37,11 @@ const GeneratorAPI = {
   },
 
   /** 获取代码生成预览数据 */
-  getPreviewData(tableName: string, pageType?: "classic" | "curd", type?: "ts" | "js") {
+  getPreviewData(tableName: string, pageType?: "classic" | "curd") {
     return request<unknown, GeneratorPreviewItem[]>({
       url: `${GENERATOR_BASE_URL}/${tableName}/preview`,
       method: "get",
-      params: buildCodegenParams(pageType, type),
+      params: buildCodegenParams(pageType),
     });
   },
 
@@ -61,11 +54,11 @@ const GeneratorAPI = {
   },
 
   /** 下载代码生成 ZIP 文件 */
-  download(tableName: string, pageType?: "classic" | "curd", type?: "ts" | "js") {
+  download(tableName: string, pageType?: "classic" | "curd") {
     return request({
       url: `${GENERATOR_BASE_URL}/${tableName}/download`,
       method: "get",
-      params: buildCodegenParams(pageType, type),
+      params: buildCodegenParams(pageType),
       responseType: "blob",
     }).then((response) => {
       const contentDisposition = response?.headers?.["content-disposition"] as string | undefined;

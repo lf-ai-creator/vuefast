@@ -6,31 +6,25 @@ import type { BaseQueryParams } from "@/api/common";
 
 /** [[ business_name ]]查询参数 */
 export interface [[ entity_name ]]QueryParams extends BaseQueryParams {
-{% for c in columns %}{% if c.is_show_in_query %}{% if c.field_comment %}  /** [[ c.field_comment ]] */{% endif %}
-
-{% if c.form_type_name in ("DATE", "DATE_TIME") %}{% if c.query_type_name == "BETWEEN" %}  [[ c.field_name ]]?: [string, string];
-{% else %}  [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% else %}  [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% endif %}{% endfor %}
-}
+{% for c in query_columns %}  /** [[ c.field_comment ]] */
+  [[ c.field_name ]]?: [[ c.ts_query_type ]];
+{% endfor %}}
 
 /** [[ business_name ]]表单对象 */
 export interface [[ entity_name ]]Form {
+  /** 主键 */
   id?: string;
-{% for c in columns %}{% if c.is_show_in_form %}{% if c.field_comment %}  /** [[ c.field_comment ]] */{% endif %}
-
+{% for c in form_columns_config %}  /** [[ c.field_comment ]] */
   [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% endfor %}
-}
-
-/** [[ business_name ]]详情对象 */
-export type [[ entity_name ]]Detail = [[ entity_name ]]Item & [[ entity_name ]]Form;
+{% endfor %}}
 
 /** [[ business_name ]]列表项 */
 export interface [[ entity_name ]]Item {
-  id?: string | number;
-{% for c in columns %}{% if c.is_show_in_list %}{% if c.field_comment %}  /** [[ c.field_comment ]] */{% endif %}
-
+  /** 主键 */
+  id?: string;
+{% for c in list_columns %}  /** [[ c.field_comment ]] */
   [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% endfor %}
-}
+{% endfor %}}
+
+/** [[ business_name ]]详情对象 */
+export type [[ entity_name ]]Detail = [[ entity_name ]]Item & [[ entity_name ]]Form;

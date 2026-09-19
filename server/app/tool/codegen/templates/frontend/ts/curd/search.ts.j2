@@ -1,0 +1,36 @@
+import type { ISearchConfig } from "@/components/CURD/types";
+
+const searchConfig: ISearchConfig = {
+  permPrefix: "[[ perm_prefix ]]",
+  formItems: [
+{% for c in query_columns %}    {
+      type: "[[ c.curd_search_type ]]",
+      label: "[[ c.query_name ]]",
+      prop: "[[ c.field_name ]]",
+      attrs: {
+{% if c.curd_search_type == "input" %}        placeholder: "请输入[[ c.query_name ]]",
+{% elif c.curd_search_type == "input-number" %}        placeholder: "请输入[[ c.query_name ]]",
+        controls: false,
+{% elif c.curd_search_type == "date-picker" %}{% if c.query_type_name == "BETWEEN" %}        type: "[[ 'daterange' if c.form_control == 'date' else 'datetimerange' ]]",
+        rangeSeparator: "~",
+        startPlaceholder: "开始时间",
+        endPlaceholder: "结束时间",
+{% else %}        type: "[[ 'date' if c.form_control == 'date' else 'datetime' ]]",
+        placeholder: "请选择[[ c.query_name ]]",
+{% endif %}        valueFormat: "[[ c.date_format ]]",
+{% else %}        placeholder: "全部",
+        clearable: true,
+{% endif %}        style: { width: "200px" },
+      },
+{% if c.curd_search_type == "select" %}      options: [[ lb ]]
+{% if c.dict_type %}        // TODO: 字典「[[ c.dict_type ]]」的选项需按需加载，可在 initFn 中调用字典接口后写入本数组
+{% elif c.query_control == "boolean-select" %}        { label: "[[ c.true_label ]]", value: 1 },
+        { label: "[[ c.false_label ]]", value: 0 },
+{% else %}        { label: "选项一", value: 0 },
+        { label: "选项二", value: 1 },
+{% endif %}      ],
+{% endif %}    },
+{% endfor %}  ],
+};
+
+export default searchConfig;

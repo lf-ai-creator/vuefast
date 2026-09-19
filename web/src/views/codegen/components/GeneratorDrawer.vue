@@ -285,8 +285,7 @@ async function handleDownload() {
   try {
     await GeneratorAPI.download(
       currentTableName.value,
-      genConfigFormData.value.pageType || "classic",
-      "ts"
+      genConfigFormData.value.pageType || "classic"
     );
     ElMessage.success("代码下载成功");
   } catch {

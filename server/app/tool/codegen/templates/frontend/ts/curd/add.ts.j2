@@ -1,0 +1,57 @@
+import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+import type { [[ entity_name ]]Form } from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+import type { IModalConfig } from "@/components/CURD/types";
+
+const modalConfig: IModalConfig<[[ entity_name ]]Form> = {
+  permPrefix: "[[ perm_prefix ]]",
+{% if form_layout == "drawer" %}  component: "drawer",
+  drawer: {
+    title: "新增[[ business_name ]]",
+    size: "[[ form_width ]]",
+  },
+{% else %}  dialog: {
+    title: "新增[[ business_name ]]",
+    width: "[[ form_width ]]",
+  },
+{% endif %}  form: {
+    labelWidth: 100,
+  },
+  formAction: [[ entity_name ]]API.create,
+  formItems: [
+{% for c in form_columns_config %}    {
+      label: "[[ c.field_comment ]]",
+      prop: "[[ c.field_name ]]",
+{% if c.is_required %}      rules: [{ required: true, message: "[[ c.required_action ]][[ c.field_comment ]]", trigger: "[[ c.required_trigger ]]" }],
+{% endif %}      type: "[[ c.curd_modal_type ]]",
+{% if c.curd_modal_type == "custom" %}      attrs: { style: { width: "100%" } },
+{% elif c.curd_modal_type == "switch" %}      initialValue: 1,
+      attrs: {
+        inlinePrompt: true,
+        activeText: "[[ c.true_label ]]",
+        inactiveText: "[[ c.false_label ]]",
+        activeValue: 1,
+        inactiveValue: 0,
+      },
+{% elif c.curd_modal_type == "date-picker" %}      attrs: {
+        type: "[[ 'date' if c.form_control == 'date' else 'datetime' ]]",
+        placeholder: "请选择[[ c.field_comment ]]",
+        valueFormat: "[[ c.date_format ]]",
+      },
+{% else %}      attrs: {
+{% if c.form_control == "textarea" %}        type: "textarea",
+{% elif c.form_control == "number" %}        controls: false,
+{% endif %}        placeholder: "[[ c.required_action ]][[ c.field_comment ]]",
+      },
+{% endif %}{% if c.curd_modal_type in ("select", "radio", "checkbox") %}      options: [[ lb ]]
+{% if c.dict_type %}        // TODO: 字典「[[ c.dict_type ]]」的选项需按需加载，可在 initFn 中调用字典接口后写入本数组
+{% elif c.form_control == "boolean-select" %}        { label: "[[ c.true_label ]]", value: 1 },
+        { label: "[[ c.false_label ]]", value: 0 },
+{% else %}        { label: "选项一", value: 0 },
+        { label: "选项二", value: 1 },
+{% endif %}      ],
+{% endif %}      col: { xs: 24, sm: [[ form_span ]] },
+    },
+{% endfor %}  ],
+};
+
+export default reactive(modalConfig);

@@ -1,46 +1,71 @@
 import request from "@/utils/request";
-const BASE_URL = "/api/v1/[[ entity_kebab ]]";
+
+const [[ entity_upper_snake ]]_BASE_URL = "/api/v1/[[ entity_kebab ]]";
 
 const [[ entity_name ]]API = {
-  getPage(queryParams?: [[ entity_name ]]PageQuery) {
+  /** 获取[[ business_name ]]分页数据 */
+  getPage(queryParams: [[ entity_name ]]PageQuery) {
     return request<PageResult<[[ entity_name ]]Item>>({
-      url: BASE_URL,
+      url: `${[[ entity_upper_snake ]]_BASE_URL}`,
       method: "GET",
       data: queryParams,
     });
   },
-  getFormData(id: number) {
+
+  /** 获取[[ business_name ]]表单数据 */
+  getFormData(id: string | number) {
     return request<[[ entity_name ]]Form>({
-      url: `${BASE_URL}/${id}/form`,
+      url: `${[[ entity_upper_snake ]]_BASE_URL}/${id}/form`,
       method: "GET",
     });
   },
+{% if form_enabled %}
+  /** 新增[[ business_name ]] */
   create(data: [[ entity_name ]]Form) {
-    return request({ url: BASE_URL, method: "POST", data });
+    return request({
+      url: `${[[ entity_upper_snake ]]_BASE_URL}`,
+      method: "POST",
+      data,
+    });
   },
-  update(id: number, data: [[ entity_name ]]Form) {
-    return request({ url: `${BASE_URL}/${id}`, method: "PUT", data });
+
+  /** 修改[[ business_name ]] */
+  update(id: string | number, data: [[ entity_name ]]Form) {
+    return request({
+      url: `${[[ entity_upper_snake ]]_BASE_URL}/${id}`,
+      method: "PUT",
+      data,
+    });
   },
+{% endif %}{% if delete_enabled %}
+  /**
+   * 删除[[ business_name ]]
+   *
+   * @param ids [[ business_name ]]ID，多个以英文逗号(,)分隔
+   */
   deleteByIds(ids: string) {
-    return request({ url: `${BASE_URL}/${ids}`, method: "DELETE" });
+    return request({
+      url: `${[[ entity_upper_snake ]]_BASE_URL}/${ids}`,
+      method: "DELETE",
+    });
   },
-};
+{% endif %}};
 
 export default [[ entity_name ]]API;
 
-export interface [[ entity_name ]]PageQuery {
-  pageNum?: number;
-  pageSize?: number;
-  keywords?: string;
-{% for c in columns %}{% if c.is_show_in_query %}  [[ c.field_name ]]?: [[ c.ts_type ]]{% if c.query_type_name == "BETWEEN" %}[]{% endif %};
-{% endif %}{% endfor %}}
+/** [[ business_name ]]分页查询参数 */
+export interface [[ entity_name ]]PageQuery extends PageQuery {
+{% for c in query_columns %}  [[ c.field_name ]]?: [[ c.ts_query_type ]];
+{% endfor %}}
 
+/** [[ business_name ]]列表项 */
 export interface [[ entity_name ]]Item {
-  id: number;
-{% for c in columns %}{% if c.is_show_in_list %}  [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% endfor %}}
+  id?: string;
+{% for c in list_columns %}  [[ c.field_name ]]?: [[ c.ts_type ]];
+{% endfor %}}
 
+/** [[ business_name ]]表单对象 */
 export interface [[ entity_name ]]Form {
-  id?: number;
-{% for c in columns %}{% if c.is_show_in_form %}  [[ c.field_name ]]?: [[ c.ts_type ]];
-{% endif %}{% endfor %}}
+  id?: string;
+{% for c in form_columns_config %}  [[ c.field_name ]]?: [[ c.ts_type ]];
+{% endfor %}}

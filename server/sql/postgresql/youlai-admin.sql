@@ -256,6 +256,8 @@ INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_pa
 
 -- 代码生成
 INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component, perm, always_show, keep_alive, visible, sort, icon, redirect, create_time, update_time, params) VALUES (201, 2, '0,2', '代码生成', 'M', 'Codegen', 'index', 'codegen/index', NULL, NULL, 1, 1, 1, 'code', NULL, now(), now(), NULL);
+INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component, perm, always_show, keep_alive, visible, sort, icon, redirect, create_time, update_time, params) VALUES (20101, 201, '0,2,201', '代码生成查询', 'B', NULL, '', NULL, 'sys:codegen:list', NULL, 0, 1, 1, '', NULL, now(), now(), NULL);
+INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component, perm, always_show, keep_alive, visible, sort, icon, redirect, create_time, update_time, params) VALUES (20102, 201, '0,2,201', '代码生成配置', 'B', NULL, '', NULL, 'sys:codegen:update', NULL, 0, 1, 2, '', NULL, now(), now(), NULL);
 
 -- 项目资源（原"项目文档"；范围扩展为文档 + 接口 + 源码仓库的资源导航）
 -- 实战文档双形态置顶（内嵌 iframe + 外链新标签），直观演示系统对两种外链打开方式的支持
@@ -415,7 +417,7 @@ INSERT INTO sys_role_menu VALUES (7, 1) ON CONFLICT DO NOTHING;
 INSERT INTO sys_role_menu VALUES (7, 101), (7, 10101), (7, 10102), (7, 10103), (7, 10104), (7, 10105), (7, 10106), (7, 10107) ON CONFLICT DO NOTHING;
 INSERT INTO sys_role_menu VALUES (7, 102), (7, 10201), (7, 10202), (7, 10203), (7, 10204), (7, 10205) ON CONFLICT DO NOTHING;
 -- 代码生成
-INSERT INTO sys_role_menu VALUES (2, 201) ON CONFLICT DO NOTHING;
+INSERT INTO sys_role_menu VALUES (2, 201), (2, 20101), (2, 20102) ON CONFLICT DO NOTHING;
 -- 项目资源
 INSERT INTO sys_role_menu VALUES (2, 601), (2, 602), (2, 603), (2, 604), (2, 605), (2, 606), (2, 607), (2, 608) ON CONFLICT DO NOTHING;
 -- 通用组件（301 基础 / 302 表单 / 303 表格）

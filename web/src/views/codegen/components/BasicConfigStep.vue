@@ -109,6 +109,13 @@
                       封装(CURD)
                     </el-radio-button>
                   </el-radio-group>
+                  <div class="field-tip">
+                    {{
+                      formData.pageType === "curd"
+                        ? "生成 PageSearch / PageContent / PageModal 组合页面与 config/*.ts 配置文件"
+                        : "生成单文件 Element Plus 管理页面"
+                    }}
+                  </div>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -120,10 +127,12 @@
                       <span>上级菜单</span>
                       <el-tooltip effect="dark" placement="top">
                         <template #content>
-                          <div style="max-width: 280px; line-height: 1.8">
-                            选择上级菜单，生成代码后会自动创建对应菜单。
+                          <div style="max-width: 300px; line-height: 1.8">
+                            选择上级菜单后，生成结果会附带一份菜单初始化 SQL（server/sql/），
+                            需手工执行该脚本，再到「角色管理」把新增菜单与按钮权限分配给角色，
+                            页面才会出现在侧边栏。
                             <br />
-                            注意：生成菜单后需分配权限给角色，否则菜单将无法显示。
+                            不选择则只生成代码，不生成菜单脚本。
                           </div>
                         </template>
                         <el-icon class="cursor-pointer text-gray-400 hover:text-primary">
@@ -216,6 +225,7 @@
 <script setup lang="ts">
 import type { GenConfigForm } from "@/api/codegen";
 import type { OptionItem } from "@/api/common";
+import { toKebab, toSnake } from "../utils/naming";
 
 const formData = defineModel<GenConfigForm>({ required: true });
 
@@ -242,71 +252,114 @@ interface GeneratedFileGroup {
 const generatedFileGroups = computed<GeneratedFileGroup[]>(() => {
   const moduleName = formData.value.moduleName?.trim() || "module";
   const entityName = formData.value.entityName?.trim() || "Entity";
-  const entityLower = entityName.charAt(0).toLowerCase() + entityName.slice(1);
-  const entityPath = entityName.toLowerCase();
+  const entitySnake = toSnake(entityName) || "entity";
+  const entityKebab = toKebab(entityName) || "entity";
   const businessName = formData.value.businessName?.trim() || entityName;
   const author = formData.value.author?.trim() || "youlai-fastapi";
-  const serverRoot = `server/app/${moduleName}/${entityLower}`;
-  const webApiRoot = `web/src/api/${moduleName}/${entityPath}`;
-  const webViewRoot = `web/src/views/${moduleName}/${entityPath}`;
-  const appViewRoot = `app/src/subPages/work/${entityPath}`;
-  const pyComment = (name: string) => `"""${businessName}${name} — 由 ${author} 生成。"""`;
-  const tsComment = (name: string) => `/** ${businessName}${name} — 由 ${author} 生成。 */`;
+  const formEnabled = formData.value.formEnabled !== 0;
+  const isCurd = formData.value.pageType === "curd";
+  const hasMenu = formData.value.parentMenuId !== null && formData.value.parentMenuId !== undefined;
+  const serverRoot = `server/app/${moduleName}/${entitySnake}`;
+  const webApiRoot = `web/src/api/${moduleName}/${entityKebab}`;
+  const webViewRoot = `web/src/views/${moduleName}/${entityKebab}`;
+  const appApiFile = `app/src/api/${entityKebab}.ts`;
+  const appViewRoot = `app/src/subPages/work/${entityKebab}`;
+  const pyComment = (suffix: string) => `"""${suffix} — 由 ${author} 生成。"""`;
+  const tsComment = (suffix: string) => `/** ${suffix} — 由 ${author} 生成。 */`;
+
+  const serverFiles: GeneratedFileItem[] = [
+    {
+      path: `${serverRoot}/__init__.py`,
+      description: "模块说明与 main.py / registry.py 接入步骤",
+      comment: pyComment(`${businessName}生成模块`),
+    },
+    {
+      path: `${serverRoot}/models.py`,
+      description: "SQLAlchemy 模型（复用 BaseIdMixin / TimestampMixin）",
+      comment: pyComment(`${entityName} ORM 模型`),
+    },
+    {
+      path: `${serverRoot}/schemas.py`,
+      description: "Pydantic 查询、表单与响应模型",
+      comment: pyComment(`${entityName} Pydantic Schemas`),
+    },
+    {
+      path: `${serverRoot}/service.py`,
+      description: "分页查询与增删改业务服务",
+      comment: pyComment(`${entityName} 服务`),
+    },
+    {
+      path: `${serverRoot}/router.py`,
+      description: "FastAPI 路由与权限校验",
+      comment: pyComment(`${entityName} 路由`),
+    },
+  ];
+  if (hasMenu) {
+    serverFiles.push({
+      path: `server/sql/${entitySnake}_menu.sql`,
+      description: "菜单与按钮权限初始化脚本，需手工执行",
+      comment: `-- ${businessName} 菜单初始化脚本 — 由 ${author} 生成`,
+    });
+  }
+
+  const webFiles: GeneratedFileItem[] = [
+    {
+      path: `${webApiRoot}/index.ts`,
+      description: "后台管理 API 请求封装",
+      comment: tsComment(`${businessName}接口`),
+    },
+    {
+      path: `${webApiRoot}/types.ts`,
+      description: "查询参数、表单与列表类型",
+      comment: tsComment(`${entityName} ${businessName}类型定义`),
+    },
+    {
+      path: `${webViewRoot}/index.vue`,
+      description: isCurd ? "CURD 封装页面（组合 PageSearch/PageContent/PageModal）" : "Element Plus 管理页面",
+      comment: `defineOptions({ name: "${entityName}" })`,
+    },
+  ];
+  if (isCurd) {
+    webFiles.push(
+      {
+        path: `${webViewRoot}/config/search.ts`,
+        description: "搜索表单配置",
+        comment: "const searchConfig: ISearchConfig",
+      },
+      {
+        path: `${webViewRoot}/config/content.ts`,
+        description: "列表与分页配置",
+        comment: "const contentConfig: IContentConfig",
+      }
+    );
+    if (formEnabled) {
+      webFiles.push(
+        {
+          path: `${webViewRoot}/config/add.ts`,
+          description: "新增表单配置",
+          comment: "const modalConfig: IModalConfig",
+        },
+        {
+          path: `${webViewRoot}/config/edit.ts`,
+          description: "修改表单配置",
+          comment: "const modalConfig: IModalConfig",
+        }
+      );
+    }
+  }
 
   return [
     {
       scope: "server",
       label: "Server",
       icon: "Cpu",
-      files: [
-        {
-          path: `${serverRoot}/__init__.py`,
-          description: "模块导出与路由注册入口",
-          comment: pyComment("模块"),
-        },
-        {
-          path: `${serverRoot}/models.py`,
-          description: "SQLAlchemy 数据模型",
-          comment: pyComment("数据模型"),
-        },
-        {
-          path: `${serverRoot}/schemas.py`,
-          description: "Pydantic 查询、表单与响应模型",
-          comment: pyComment("数据模型定义"),
-        },
-        {
-          path: `${serverRoot}/service.py`,
-          description: "分页查询与增删改业务服务",
-          comment: pyComment("业务服务"),
-        },
-        {
-          path: `${serverRoot}/router.py`,
-          description: "FastAPI 路由与权限校验",
-          comment: pyComment("接口路由"),
-        },
-      ],
+      files: serverFiles,
     },
     {
       scope: "web",
       label: "Web",
       icon: "Monitor",
-      files: [
-        {
-          path: `${webApiRoot}/index.ts`,
-          description: "后台管理 API 请求封装",
-          comment: tsComment("接口"),
-        },
-        {
-          path: `${webApiRoot}/types.ts`,
-          description: "查询参数、表单与列表类型",
-          comment: tsComment("类型定义"),
-        },
-        {
-          path: `${webViewRoot}/index.vue`,
-          description: "Element Plus 管理页面",
-          comment: tsComment("管理页面"),
-        },
-      ],
+      files: webFiles,
     },
     {
       scope: "app",
@@ -314,14 +367,14 @@ const generatedFileGroups = computed<GeneratedFileGroup[]>(() => {
       icon: "Iphone",
       files: [
         {
-          path: `app/src/api/${entityPath}.ts`,
-          description: "uni-app API 请求封装",
-          comment: tsComment("移动端接口"),
+          path: appApiFile,
+          description: "uni-app API 请求封装与类型",
+          comment: tsComment(`${businessName}移动端接口`),
         },
         {
           path: `${appViewRoot}/index.vue`,
           description: "uni-app 移动端业务页面",
-          comment: tsComment("移动端页面"),
+          comment: `definePage({ name: "${entityKebab}" })`,
         },
       ],
     },

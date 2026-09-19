@@ -1,0 +1,76 @@
+<template>
+  <div class="page-container h-full flex flex-1 flex-col">
+    <page-search
+      ref="searchRef"
+      :search-config="searchConfig"
+      @query-click="handleQueryClick"
+      @reset-click="handleResetClick"
+    />
+
+    <page-content
+      ref="contentRef"
+      :content-config="contentConfig"
+{% if form_enabled %}      @add-click="handleAddClick"
+{% endif %}      @search-click="handleSearchClick"
+{% if form_enabled %}      @operate-click="handleOperateClick"
+{% endif %}    >
+{% for c in list_columns %}{% if c.curd_col_templet == "custom" %}      <template #[[ c.field_name ]]="scope">
+        <DictTag v-model="scope.row[scope.prop as string]" code="[[ c.dict_type ]]" />
+      </template>
+{% endif %}{% endfor %}    </page-content>
+{% if form_enabled %}
+    <page-modal ref="addModalRef" :modal-config="addModalConfig" @submit-click="handleSubmitClick">
+{% for c in form_columns_config %}{% if c.curd_modal_type == "custom" and c.dict_type %}      <template #[[ c.field_name ]]="scope">
+        <DictSelect
+          v-model="scope.formData[scope.prop]"
+          code="[[ c.dict_type ]]"
+          v-bind="scope.attrs"
+        />
+      </template>
+{% endif %}{% endfor %}    </page-modal>
+
+    <page-modal ref="editModalRef" :modal-config="editModalConfig" @submit-click="handleSubmitClick">
+{% for c in form_columns_config %}{% if c.curd_modal_type == "custom" and c.dict_type %}      <template #[[ c.field_name ]]="scope">
+        <DictSelect
+          v-model="scope.formData[scope.prop]"
+          code="[[ c.dict_type ]]"
+          v-bind="scope.attrs"
+        />
+      </template>
+{% endif %}{% endfor %}    </page-modal>
+{% endif %}  </div>
+</template>
+
+<script setup lang="ts">
+import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
+{% if form_enabled %}import type { IOperateData } from "@/components/CURD/types";
+{% endif %}import usePage from "@/components/CURD/usePage";
+{% if form_enabled %}import addModalConfig from "./config/add";
+{% endif %}import contentConfig from "./config/content";
+{% if form_enabled %}import editModalConfig from "./config/edit";
+{% endif %}import searchConfig from "./config/search";
+
+defineOptions({
+  name: "[[ entity_name ]]",
+  inheritAttrs: false,
+});
+
+const {
+  searchRef,
+  contentRef,
+{% if form_enabled %}  addModalRef,
+  editModalRef,
+{% endif %}  handleQueryClick,
+  handleResetClick,
+{% if form_enabled %}  handleAddClick,
+  handleEditClick,
+  handleSubmitClick,
+{% endif %}  handleSearchClick,
+} = usePage();
+{% if form_enabled %}
+/** 行内「编辑」：先按 id 回填表单数据，再打开弹窗/抽屉 */
+async function handleOperateClick(data: IOperateData): Promise<void> {
+  if (data.name !== "edit") return;
+  await handleEditClick(data.row, async () => await [[ entity_name ]]API.getFormData(String(data.row.id)));
+}
+{% endif %}</script>

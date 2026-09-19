@@ -1,80 +1,151 @@
 <template>
-  <view class="page-container">
-    <wd-search v-model="queryParams.keywords" placeholder="搜索[[ business_name ]]" hide-cancel @search="load" />
-    <view class="mt-16rpx">
-      <wd-card v-for="item in list" :key="item.id" @click="openForm(item.id)">
-{% for c in columns %}{% if c.is_show_in_list %}        <view class="flex-between mb-8rpx">
-          <text class="text-28rpx color-text-primary">[[ c.list_name or c.field_name ]]</text>
-          <text class="text-28rpx">{{ item.[[ c.field_name ]] ?? "-" }}</text>
-        </view>
-{% endif %}{% endfor %}        <view class="flex-end mt-8rpx">
+  <view>
+{% if app_search_column %}    <wd-search v-model="queryParams.[[ app_search_column.field_name ]]" placeholder="搜索[[ app_search_column.query_name ]]" hide-cancel @search="reload" />
+
+{% endif %}    <view class="mt-16rpx">
+      <wd-card v-for="item in items" :key="String(item.id)" @click="openForm(item.id)">
+{% for c in list_columns %}        <view class="flex-between mb-8rpx">
+          <text class="text-28rpx color-text-secondary">[[ c.list_name ]]</text>
+{% if c.is_date_like %}          <text class="text-28rpx">{{ formatDateTime(item.[[ c.field_name ]]) || "-" }}</text>
+{% else %}          <text class="text-28rpx">{{ item.[[ c.field_name ]] ?? "-" }}</text>
+{% endif %}        </view>
+{% endfor %}        <view class="flex-end mt-8rpx">
 {% if delete_enabled and delete_type in ("single_batch", "single") %}          <wd-button size="small" type="error" plain @click.stop="remove(item.id)">删除</wd-button>
-{% endif %}
-        </view>
+{% endif %}        </view>
       </wd-card>
-      <wd-loadmore v-if="loading" state="loading" />
-      <wd-empty v-else-if="!list.length" tip="暂无数据" />
+
+      <wd-loadmore v-if="loadMoreState !== 'idle'" :state="loadMoreState" @reload="retry" />
+      <wd-empty v-else-if="total === 0" icon="search-line" tip="暂无数据" />
     </view>
-    <wd-popup v-model="dialog.visible" position="bottom" custom-class="popup-bottom">
+{% if form_enabled %}
+    <wd-popup
+      v-model="dialog.visible"
+      position="bottom"
+      custom-class="popup-bottom"
+      @close="closeForm"
+    >
       <view class="p-4">
-        <view class="popup-title">{{ formData.id ? "编辑[[ business_name ]]" : "新增[[ business_name ]]" }}</view>
-        <wd-form :model="formData">
-{% for c in columns %}{% if c.is_show_in_form and c.form_type_name != "HIDDEN" %}        <wd-form-item title="[[ c.field_comment or c.field_name ]]" prop="[[ c.field_name ]]">
-          <wd-input v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment or c.field_name ]]" />
-        </wd-form-item>
-{% endif %}{% endfor %}        </wd-form>
+        <view class="popup-title">
+          {{ formData.id ? "编辑[[ business_name ]]" : "新增[[ business_name ]]" }}
+        </view>
+        <wd-form ref="formRef" :model="formData" :schema="formRules">
+{% for c in form_columns_config %}          <wd-form-item prop="[[ c.field_name ]]" title="[[ c.field_comment ]]"{% if c.is_required %} required{% endif %}>
+{% if c.form_control == "textarea" %}            <wd-textarea v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment ]]" />
+{% elif c.form_control == "number" %}            <wd-input v-model="formData.[[ c.field_name ]]" type="number" placeholder="请输入[[ c.field_comment ]]" />
+{% elif c.form_control == "boolean-select" or c.form_control == "switch" %}            <wd-radio-group v-model="formData.[[ c.field_name ]]" type="button">
+              <wd-radio :value="1">[[ c.true_label ]]</wd-radio>
+              <wd-radio :value="0">[[ c.false_label ]]</wd-radio>
+            </wd-radio-group>
+{% elif c.form_control == "date" or c.form_control == "datetime" %}            <wd-datetime-picker v-model="formData.[[ c.field_name ]]" value-format="[[ c.date_format ]]" />
+{% else %}            <wd-input v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment ]]" />
+{% endif %}          </wd-form-item>
+{% endfor %}        </wd-form>
         <view class="popup-actions">
-          <wd-button type="info" variant="plain" @click="dialog.visible = false">取消</wd-button>
+          <wd-button type="info" variant="plain" @click="closeForm">取消</wd-button>
           <wd-button :loading="submitting" @click="submit">保存</wd-button>
         </view>
       </view>
     </wd-popup>
-  </view>
+
+    <wd-fab
+      v-if="hasPermission('[[ perm_prefix ]]:create') && !dialog.visible"
+      :expandable="false"
+      :gap="{ bottom: 32 }"
+    >
+      <template #trigger>
+        <view class="work-fab-trigger" @click="openForm()">
+          <wd-icon name="plus" size="20" color="var(--color-text-inverse)" />
+        </view>
+      </template>
+    </wd-fab>
+{% endif %}  </view>
 </template>
 
 <script lang="ts" setup>
-import { onLoad, onPullDownRefresh } from "@dcloudio/uni-app";
-import [[ entity_name ]]API, { type [[ entity_name ]]Form, type [[ entity_name ]]Item, type [[ entity_name ]]PageQuery } from "@/api/[[ entity_kebab ]]";
+import { onLoad } from "@dcloudio/uni-app";
+import { useToast } from "@wot-ui/ui";
+import [[ entity_name ]]API, {
+  type [[ entity_name ]]Form,
+  type [[ entity_name ]]PageQuery,
+} from "@/api/[[ entity_kebab ]]";
+import { usePagedList } from "@/composables/usePagedList";
+import { hasPermission } from "@/utils/permission";
+import { toFormSchema } from "@/utils/form-schema";
+{% if has_list_date %}import { formatDateTime } from "@/utils/format";
+{% endif %}
+definePage({
+  name: "[[ entity_kebab ]]",
+  style: { navigationBarTitleText: "[[ business_name ]]", enablePullDownRefresh: true },
+});
 
-definePage({ name: "[[ entity_kebab ]]", style: { navigationBarTitleText: "[[ business_name ]]" } });
-const list = ref<[[ entity_name ]]Item[]>([]);
-const loading = ref(false);
+const toast = useToast();
+const formRef = ref();
 const submitting = ref(false);
 const queryParams = reactive<[[ entity_name ]]PageQuery>({ pageNum: 1, pageSize: 10 });
 const dialog = reactive({ visible: false });
-const formData = reactive<[[ entity_name ]]Form>({});
+const initialFormData: [[ entity_name ]]Form = {
+  id: undefined,
+{% for c in form_columns_config %}{% if c.form_control in ("boolean-select", "switch") %}  [[ c.field_name ]]: 1,
+{% endif %}{% endfor %}};
+const formData = reactive<[[ entity_name ]]Form>({ ...initialFormData });
 
-async function load() {
-  loading.value = true;
-  try {
-    const page = await [[ entity_name ]]API.getPage(queryParams);
-    list.value = page.list ?? [];
-  } finally {
-    loading.value = false;
-  }
-}
-async function openForm(id?: number) {
-  Object.keys(formData).forEach((key) => delete (formData as Record<string, unknown>)[key]);
-  if (id) Object.assign(formData, await [[ entity_name ]]API.getFormData(id));
+const { items, total, loadMoreState, reload, retry } = usePagedList(
+  [[ entity_name ]]API.getPage,
+  queryParams
+);
+
+const formRules = toFormSchema({
+{% for c in form_columns_config %}{% if c.is_required %}  [[ c.field_name ]]: [{ required: true, message: "[[ c.required_action ]][[ c.field_comment ]]" }],
+{% endif %}{% endfor %}});
+
+/** 打开新增/编辑弹窗，传入 id 时拉取表单数据回填 */
+async function openForm(id?: string): Promise<void> {
+  formRef.value?.reset();
+  Object.assign(formData, initialFormData);
   dialog.visible = true;
-}
-async function submit() {
-  submitting.value = true;
-  try {
-    if (formData.id) await [[ entity_name ]]API.update(formData.id, formData);
-    else await [[ entity_name ]]API.create(formData);
-    dialog.visible = false;
-    await load();
-  } finally {
-    submitting.value = false;
+  if (id) {
+    formData.id = id;
+    Object.assign(formData, await [[ entity_name ]]API.getFormData(id), { id });
   }
 }
-async function remove(id: number) {
+
+/** 关闭弹窗并清理临时数据 */
+function closeForm(): void {
+  dialog.visible = false;
+  formRef.value?.reset();
+  Object.assign(formData, initialFormData);
+}
+
+/** 提交表单（新增或修改） */
+function submit(): void {
+  formRef.value?.validate().then(({ valid }: { valid: boolean }) => {
+    if (!valid) return;
+    submitting.value = true;
+    const id = formData.id;
+    const action = id ? [[ entity_name ]]API.update(id, formData) : [[ entity_name ]]API.create(formData);
+    action
+      .then(() => {
+        toast.success("操作成功");
+        closeForm();
+        reload();
+      })
+      .finally(() => {
+        submitting.value = false;
+      });
+  });
+}
+{% if delete_enabled %}
+/** 删除单条[[ business_name ]]，删除前二次确认 */
+async function remove(id?: string): Promise<void> {
+  if (!id) return;
   const result = await uni.showModal({ title: "提示", content: "确定删除这条数据吗？" });
   if (!result.confirm) return;
   await [[ entity_name ]]API.deleteByIds(String(id));
-  await load();
+  toast.success("删除成功");
+  reload();
 }
-onLoad(load);
-onPullDownRefresh(async () => { await load(); uni.stopPullDownRefresh(); });
+{% endif %}
+onLoad(() => {
+  reload();
+});
 </script>

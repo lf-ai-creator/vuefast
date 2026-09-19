@@ -1,1 +1,22 @@
-"""[[ business_name ]]生成模块。"""
+"""[[ business_name ]]生成模块 — 由 [[ author ]] 生成。
+
+接入步骤（生成后需要手工完成，代码生成器不会修改已有文件）：
+
+1. 若 ``server/app/[[ module_name ]]/__init__.py`` 不存在，先创建该空文件。
+2. 在 ``server/app/registry.py`` 末尾追加，供 alembic autogenerate 收集元数据：
+
+       from app.[[ module_name ]].[[ entity_snake ]] import models as _[[ entity_snake ]]_models  # noqa: F401
+
+3. 在 ``server/app/main.py`` 的 ``create_app`` 中挂载路由：
+
+       from app.[[ module_name ]].[[ entity_snake ]].router import router as [[ entity_snake ]]_router
+
+       app.include_router([[ entity_snake ]]_router)
+
+4. 表结构需要迁移时执行 ``alembic revision --autogenerate -m "add [[ table_name ]]"`` 后再 ``alembic upgrade head``。
+{% if parent_menu_id is not none %}
+5. 菜单初始化脚本已随代码一起生成：``server/sql/[[ entity_snake ]]_menu.sql``。
+   执行后还需在「角色管理」中把新增菜单与按钮权限分配给对应角色，否则页面不会出现在侧边栏。
+{% endif %}{% for note in notes %}
+注意：[[ note ]]
+{% endfor %}"""

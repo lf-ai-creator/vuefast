@@ -1,0 +1,54 @@
+-- [[ business_name ]] 菜单初始化脚本 — 由 [[ author ]] 生成
+--
+-- 执行方式：psql -h <host> -U <user> -d <database> -f [[ entity_snake ]]_menu.sql
+-- 脚本按权限标识判重，可重复执行；执行后还需在「角色管理」中把菜单与按钮权限分配给对应角色，
+-- 否则页面不会出现在侧边栏。
+
+DO $$
+DECLARE
+    v_parent_id bigint := [[ parent_menu_id ]];
+    v_parent_tree text;
+    v_menu_id bigint;
+    v_perm_prefix text := '[[ perm_prefix ]]';
+    v_menu_tree text;
+BEGIN
+    SELECT tree_path INTO v_parent_tree FROM sys_menu WHERE id = v_parent_id;
+    IF v_parent_tree IS NULL THEN
+        RAISE EXCEPTION '上级菜单 % 不存在，请先在菜单管理中创建', v_parent_id;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM sys_menu WHERE perm = v_perm_prefix || ':list') THEN
+        RAISE NOTICE '菜单 % 已存在，跳过初始化', v_perm_prefix;
+        RETURN;
+    END IF;
+
+    v_menu_id := nextval(pg_get_serial_sequence('sys_menu', 'id'));
+    v_menu_tree := v_parent_tree || ',' || v_parent_id;
+    INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component,
+                          perm, keep_alive, visible, sort, icon, create_time, update_time)
+    VALUES (v_menu_id, v_parent_id, v_menu_tree, '[[ business_name_sql ]]', 'M', '[[ entity_name ]]',
+            '[[ entity_kebab ]]', '[[ module_name ]]/[[ entity_kebab ]]/index', NULL, 1, 1, 1, '',
+            now(), now());
+
+    INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component,
+                          perm, keep_alive, visible, sort, icon, create_time, update_time)
+    VALUES (nextval(pg_get_serial_sequence('sys_menu', 'id')), v_menu_id, v_menu_tree || ',' || v_menu_id,
+            '查询', 'B', NULL, '', NULL, v_perm_prefix || ':list', 0, 1, 1, '', now(), now());
+{% if form_enabled %}
+    INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component,
+                          perm, keep_alive, visible, sort, icon, create_time, update_time)
+    VALUES (nextval(pg_get_serial_sequence('sys_menu', 'id')), v_menu_id, v_menu_tree || ',' || v_menu_id,
+            '新增', 'B', NULL, '', NULL, v_perm_prefix || ':create', 0, 1, 2, '', now(), now());
+
+    INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component,
+                          perm, keep_alive, visible, sort, icon, create_time, update_time)
+    VALUES (nextval(pg_get_serial_sequence('sys_menu', 'id')), v_menu_id, v_menu_tree || ',' || v_menu_id,
+            '修改', 'B', NULL, '', NULL, v_perm_prefix || ':update', 0, 1, 3, '', now(), now());
+{% endif %}{% if delete_enabled %}
+    INSERT INTO sys_menu (id, parent_id, tree_path, name, type, route_name, route_path, component,
+                          perm, keep_alive, visible, sort, icon, create_time, update_time)
+    VALUES (nextval(pg_get_serial_sequence('sys_menu', 'id')), v_menu_id, v_menu_tree || ',' || v_menu_id,
+            '删除', 'B', NULL, '', NULL, v_perm_prefix || ':delete', 0, 1, 4, '', now(), now());
+{% endif %}
+    RAISE NOTICE '菜单 % 初始化完成', v_perm_prefix;
+END $$;
