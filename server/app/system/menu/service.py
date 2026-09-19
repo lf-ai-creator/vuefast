@@ -2,15 +2,15 @@
 
 from datetime import datetime
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
 from app.exceptions import BusinessException
 from app.response import ResultCode
 from app.system.menu.models import SysMenu
-from app.system.role.models import SysRole, SysRoleMenu
 from app.system.menu.schemas import MenuCreate, MenuUpdate, MenuVO, RouteVO
+from app.system.role.models import SysRole, SysRoleMenu
 
 
 class MenuService:
@@ -23,9 +23,7 @@ class MenuService:
         if keywords:
             conditions.append(SysMenu.name.ilike(f"%{keywords}%"))
 
-        rows = await self.db.execute(
-            select(SysMenu).where(*conditions).order_by(SysMenu.sort.asc(), SysMenu.id.asc())
-        )
+        rows = await self.db.execute(select(SysMenu).where(*conditions).order_by(SysMenu.sort.asc(), SysMenu.id.asc()))
         menus = rows.scalars().all()
         vo_list = [self._to_vo(m) for m in menus]
         return self._build_tree(vo_list)
@@ -39,10 +37,10 @@ class MenuService:
         return self._to_vo(menu)
 
     async def get_options(self, only_parent: bool = False) -> list[dict]:
-        """返回菜单下拉选项树（递归嵌套 children）。"""
+        """返回菜单下拉树；父级候选包含各层目录和菜单，不包含按钮。"""
         stmt = select(SysMenu.id, SysMenu.parent_id, SysMenu.name, SysMenu.type).order_by(SysMenu.sort.asc())
         if only_parent:
-            stmt = stmt.where(SysMenu.parent_id == 0)
+            stmt = stmt.where(SysMenu.type != "B")
         rows = await self.db.execute(stmt)
         menus = [{"id": r.id, "parentId": r.parent_id, "name": r.name} for r in rows]
         if not menus:
@@ -56,7 +54,8 @@ class MenuService:
             tree = []
             for m in menus:
                 if m["parentId"] == parent_id:
-                    node = {"value": m["id"], "label": m["name"]}
+                    # 表单中的 BigId 序列化为字符串，选项值保持同类型才能正确回显。
+                    node = {"value": str(m["id"]), "label": m["name"]}
                     children = _build(m["id"])
                     if children:
                         node["children"] = children
@@ -113,9 +112,7 @@ class MenuService:
 
         # 路由名称唯一性校验（仅菜单和内嵌外链）
         if needs_route_name and form.routeName:
-            exists = await self.db.execute(
-                select(SysMenu.id).where(SysMenu.route_name == form.routeName)
-            )
+            exists = await self.db.execute(select(SysMenu.id).where(SysMenu.route_name == form.routeName))
             if exists.scalar() is not None:
                 raise BusinessException(code=ResultCode.OPERATE_DENIED, msg="路由名称已存在")
 
@@ -145,7 +142,7 @@ class MenuService:
             sort=form.sort,
             icon=form.icon,
             redirect=form.redirect,
-            params=form.params,
+            params=self._params_to_dict(form.params),
             create_time=datetime.now(),
         )
         self.db.add(menu)
@@ -208,7 +205,7 @@ class MenuService:
         menu.sort = form.sort
         menu.icon = form.icon
         menu.redirect = form.redirect
-        menu.params = form.params
+        menu.params = self._params_to_dict(form.params)
         menu.update_time = datetime.now()
 
         if menu.parent_id and menu.parent_id > 0:
@@ -229,9 +226,7 @@ class MenuService:
             raise BusinessException(code=ResultCode.DATA_NOT_FOUND, msg="菜单不存在")
 
         # 检查是否有子菜单
-        children = await self.db.execute(
-            select(SysMenu.id).where(SysMenu.parent_id == menu_id).limit(1)
-        )
+        children = await self.db.execute(select(SysMenu.id).where(SysMenu.parent_id == menu_id).limit(1))
         if children.scalar() is not None:
             raise BusinessException(code=ResultCode.OPERATE_DENIED, msg="存在子菜单，无法删除")
 
@@ -263,12 +258,29 @@ class MenuService:
     def _to_vo(self, m: SysMenu) -> MenuVO:
         """ORM 对象转菜单视图对象（MenuVO）。"""
         return MenuVO(
-            id=m.id, parentId=m.parent_id, name=m.name, type=m.type,
-            routeName=m.route_name, routePath=m.route_path, component=m.component,
-            externalUrl=m.external_url, perm=m.perm,
-            alwaysShow=m.always_show, keepAlive=m.keep_alive, visible=m.visible,
-            sort=m.sort, icon=m.icon, redirect=m.redirect, params=m.params,
+            id=m.id,
+            parentId=m.parent_id,
+            name=m.name,
+            type=m.type,
+            routeName=m.route_name,
+            routePath=m.route_path,
+            component=m.component,
+            externalUrl=m.external_url,
+            perm=m.perm,
+            alwaysShow=m.always_show,
+            keepAlive=m.keep_alive,
+            visible=m.visible,
+            sort=m.sort,
+            icon=m.icon,
+            redirect=m.redirect,
+            params=m.params,
         )
+
+    @staticmethod
+    def _params_to_dict(params) -> dict | None:
+        """把表单键值行转换为数据库 JSON 对象。"""
+        values = {item.key: item.value for item in params if item.key}
+        return values or None
 
     def _to_route(self, m: SysMenu) -> RouteVO:
         is_external = m.type == "E"

@@ -1,12 +1,19 @@
 """菜单管理 Schemas。"""
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 from app.serializers import BigId
 
 
 class MenuQuery(BaseModel):
     keywords: str | None = None
+
+
+class MenuParam(BaseModel):
+    key: str = Field(..., min_length=1, max_length=64)
+    value: str = Field(..., max_length=500)
 
 
 class MenuCreate(BaseModel):
@@ -24,7 +31,24 @@ class MenuCreate(BaseModel):
     sort: int = Field(default=0)
     icon: str | None = None
     redirect: str | None = None
-    params: dict | None = None
+    params: list[MenuParam] = Field(default_factory=list)
+
+    @field_validator("alwaysShow", "keepAlive", "visible", "sort", mode="before")
+    @classmethod
+    def normalize_nullable_numbers(cls, value: Any, info) -> int:
+        if value is not None:
+            return value
+        return 1 if info.field_name == "visible" else 0
+
+    @field_validator("params", mode="before")
+    @classmethod
+    def normalize_params(cls, value: Any) -> list[dict] | Any:
+        """兼容数据库和历史接口使用的 JSON 对象。"""
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            return [{"key": str(key), "value": str(item)} for key, item in value.items()]
+        return value
 
 
 class MenuUpdate(MenuCreate):
@@ -64,6 +88,7 @@ class MenuVO(BaseModel):
 
 class RouteVO(BaseModel):
     """前端路由 VO。"""
+
     name: str = ""
     path: str = ""
     component: str | None = None
