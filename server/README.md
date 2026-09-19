@@ -99,6 +99,10 @@ ruff check .
 ruff format .
 ```
 
+## 许可证
+
+本项目采用 [MIT License](../LICENSE)。
+
 ## 相关工程
 
 - PC 管理端：[`../web`](../web)

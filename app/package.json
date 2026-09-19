@@ -1,6 +1,7 @@
 {
   "name": "youlai-app",
   "version": "1.1.0",
+  "license": "MIT",
   "scripts": {
     "dev:app": "uni -p app",
     "dev:app-android": "uni -p app-android",

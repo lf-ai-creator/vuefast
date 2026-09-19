@@ -66,3 +66,7 @@ pnpm lint:prettier
 - PC 管理端：[`../web`](../web)
 - FastAPI 后端：[`../server`](../server)
 - 全局说明：[`../README.md`](../README.md)
+
+## 许可证
+
+本子工程采用 [MIT License](LICENSE)。
