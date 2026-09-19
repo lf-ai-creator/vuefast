@@ -303,6 +303,7 @@ class MenuService:
             "hidden": m.visible != 1,
             "alwaysShow": m.always_show == 1 if m.always_show is not None else False,
             "keepAlive": m.keep_alive == 1 if m.keep_alive is not None else False,
+            "params": m.params,
         }
         if is_embedded and m.external_url:
             meta["externalUrl"] = m.external_url

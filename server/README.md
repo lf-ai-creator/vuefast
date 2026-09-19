@@ -105,6 +105,17 @@
    ```bash
    fastapi dev app/main.py
    ```
+
+   **方式三：Windows 后台启动脚本（默认开启热重载）**
+   ```powershell
+   .\start-server.ps1
+   # 指定端口
+   .\start-server.ps1 -Port 8001
+   # 如需关闭热重载
+   .\start-server.ps1 -HotReload $false
+   ```
+   使用 `.\stop-server.ps1` 停止脚本启动的服务。
+
    启动后访问 [http://localhost:8000/docs](http://localhost:8000/docs)，能打开接口文档即说明后端已正常运行。
 
 5. 启动前端（可选）：

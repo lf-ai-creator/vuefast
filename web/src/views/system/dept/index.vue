@@ -154,7 +154,7 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
           <el-button @click="closeDialog">取消</el-button>
         </div>
       </template>
@@ -184,6 +184,7 @@ const queryFormRef = ref<FormInstance>();
 const deptFormRef = ref<FormInstance>();
 
 const loading = ref(false);
+const submitting = ref(false);
 const list = ref<DeptItem[]>([]);
 const queryParams = reactive<DeptQueryParams>({
   keywords: "",
@@ -254,30 +255,59 @@ function resetForm(): void {
 }
 
 /**
+ * 替换表单数据，避免切换新增/编辑时残留上一次的数据。
+ */
+function assignFormData(data: DeptForm): void {
+  Object.keys(formData).forEach((key) => {
+    delete (formData as Record<string, unknown>)[key];
+  });
+  Object.assign(formData, initialFormData, data);
+}
+
+/**
+ * 编辑部门时移除当前部门及其全部下级，避免选择后形成循环。
+ */
+function excludeDept(options: OptionItem[], deptId: string): OptionItem[] {
+  return options
+    .filter((option) => option.value !== deptId)
+    .map((option) => ({
+      ...option,
+      children: option.children ? excludeDept(option.children, deptId) : undefined,
+    }));
+}
+
+/**
  * 打开新增/编辑部门弹窗。
  *
  * @param parentId 父部门 ID（新增子部门时传入）
  * @param deptId 部门 ID（编辑时传入）
  */
 async function openDialog(parentId?: string, deptId?: string): Promise<void> {
-  const data = await DeptAPI.getOptions();
+  assignFormData({
+    ...initialFormData,
+    parentId: parentId ?? "0",
+  });
+  const [data, form] = await Promise.all([
+    DeptAPI.getOptions(),
+    deptId ? DeptAPI.getFormData(deptId) : Promise.resolve(undefined),
+  ]);
+  const availableOptions = deptId ? excludeDept(data, deptId) : data;
   deptOptions.value = [
     {
       value: "0",
       label: "顶级部门",
-      children: data,
+      children: availableOptions,
     },
   ];
 
-  dialogState.visible = true;
   if (deptId) {
     dialogState.title = "修改部门";
-    const form = await DeptAPI.getFormData(deptId);
-    Object.assign(formData, form);
+    assignFormData(form!);
   } else {
     dialogState.title = "新增部门";
-    formData.parentId = parentId || "0";
   }
+  dialogState.visible = true;
+  nextTick(() => deptFormRef.value?.clearValidate());
 }
 
 /**
@@ -290,7 +320,8 @@ async function handleSubmit(): Promise<void> {
   );
   if (!valid) return;
 
-  loading.value = true;
+  if (submitting.value) return;
+  submitting.value = true;
   try {
     const deptId = formData.id;
     if (deptId) {
@@ -303,7 +334,7 @@ async function handleSubmit(): Promise<void> {
     closeDialog();
     fetchData();
   } finally {
-    loading.value = false;
+    submitting.value = false;
   }
 }
 

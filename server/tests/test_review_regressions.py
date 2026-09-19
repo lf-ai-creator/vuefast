@@ -63,6 +63,28 @@ async def test_dept_rejects_missing_parent():
         await DeptService(db)._validate_parent(99)
 
 
+@pytest.mark.anyio
+async def test_dept_options_serialize_ids_as_strings():
+    rows = [
+        SimpleNamespace(id=1, parent_id=0, name="总部"),
+        SimpleNamespace(id=2, parent_id=1, name="研发部"),
+    ]
+    result = Mock()
+    result.__iter__ = Mock(return_value=iter(rows))
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    options = await DeptService(db).get_options()
+
+    assert options == [
+        {
+            "value": "1",
+            "label": "总部",
+            "children": [{"value": "2", "label": "研发部"}],
+        }
+    ]
+
+
 @pytest.mark.parametrize("value", ["", "abc", "1,", "0", "-1", str(2**63)])
 def test_invalid_ids_raise_validation_error(value):
     with pytest.raises(BusinessException) as error:

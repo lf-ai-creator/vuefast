@@ -1,4 +1,4 @@
-"""隐藏菜单的路由注册与角色过滤回归测试。"""
+"""菜单路由注册、参数透传与角色过滤回归测试。"""
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -11,7 +11,8 @@ from app.system.menu.service import MenuService
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("is_root", [True, False])
-async def test_hidden_menu_registered_with_role_filter(is_root):
+@pytest.mark.parametrize("params", [None, {}, {"type": "1"}, {"type": "2", "title": "参数页面"}])
+async def test_hidden_menu_registered_with_role_filter(is_root, params):
     hidden_menu = SimpleNamespace(
         id=106,
         parent_id=0,
@@ -25,6 +26,7 @@ async def test_hidden_menu_registered_with_role_filter(is_root):
         always_show=0,
         keep_alive=1,
         redirect=None,
+        params=params,
     )
     rows = MagicMock()
     rows.scalars.return_value.all.return_value = [hidden_menu]
@@ -33,6 +35,7 @@ async def test_hidden_menu_registered_with_role_filter(is_root):
     routes = await MenuService(db).get_routes(roles={"ADMIN"}, is_root=is_root)
     assert routes[0].name == "DictItem"
     assert routes[0].meta["hidden"] is True
+    assert routes[0].model_dump(mode="json")["meta"]["params"] == params
     statement = str(db.execute.call_args.args[0])
     where = statement.split("WHERE", 1)[1]
     assert "sys_menu.visible" not in where

@@ -88,6 +88,27 @@
                 <el-icon><Refresh /></el-icon>
               </el-button>
             </el-tooltip>
+            <el-popover placement="bottom-end" :width="180" trigger="click">
+              <template #reference>
+                <el-button class="page-icon-btn" aria-label="列显示设置">
+                  <el-icon><Setting /></el-icon>
+                </el-button>
+              </template>
+              <div class="column-setting">
+                <div class="column-setting__header">
+                  <span>列显示设置</span>
+                  <el-button type="primary" link @click="resetVisibleColumns">重置</el-button>
+                </div>
+                <el-checkbox-group v-model="visibleColumns" class="column-setting__list">
+                  <el-checkbox
+                    v-for="column in configurableColumns"
+                    :key="column.key"
+                    :label="column.label"
+                    :value="column.key"
+                  />
+                </el-checkbox-group>
+              </div>
+            </el-popover>
             <el-tooltip content="全屏" placement="top">
               <el-button class="page-icon-btn" @click="toggleFullscreen">
                 <el-icon><FullScreen /></el-icon>
@@ -108,7 +129,12 @@
             @selection-change="handleSelectionChange"
           >
             <el-table-column type="selection" width="42" fixed="left" align="center" />
-            <el-table-column label="昵称" min-width="140" fixed="left">
+            <el-table-column
+              v-if="isColumnVisible('nickname')"
+              label="昵称"
+              min-width="140"
+              fixed="left"
+            >
               <template #default="scope">
                 <div class="user-name-cell">
                   <el-avatar v-if="scope.row.avatar" :src="scope.row.avatar" :size="24" />
@@ -119,8 +145,14 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="用户名" min-width="120" prop="username" show-overflow-tooltip />
-            <el-table-column label="状态" align="center" width="80">
+            <el-table-column
+              v-if="isColumnVisible('username')"
+              label="用户名"
+              min-width="120"
+              prop="username"
+              show-overflow-tooltip
+            />
+            <el-table-column v-if="isColumnVisible('status')" label="状态" align="center" width="80">
               <template #default="scope">
                 <el-tag
                   :type="scope.row.status === CommonStatus.ENABLED ? 'success' : 'danger'"
@@ -130,7 +162,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="性别" align="center" width="70">
+            <el-table-column v-if="isColumnVisible('gender')" label="性别" align="center" width="70">
               <template #default="scope">
                 <el-tag
                   v-if="
@@ -148,11 +180,40 @@
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column label="部门" min-width="140" prop="deptName" show-overflow-tooltip />
-            <el-table-column label="角色" prop="roleNames" min-width="160" show-overflow-tooltip />
-            <el-table-column label="手机号码" prop="mobile" width="130" />
-            <el-table-column label="邮箱" prop="email" min-width="180" show-overflow-tooltip />
-            <el-table-column label="创建时间" prop="createTime" width="160" show-overflow-tooltip />
+            <el-table-column
+              v-if="isColumnVisible('deptName')"
+              label="部门"
+              min-width="140"
+              prop="deptName"
+              show-overflow-tooltip
+            />
+            <el-table-column
+              v-if="isColumnVisible('roleNames')"
+              label="角色"
+              prop="roleNames"
+              min-width="160"
+              show-overflow-tooltip
+            />
+            <el-table-column
+              v-if="isColumnVisible('mobile')"
+              label="手机号码"
+              prop="mobile"
+              width="130"
+            />
+            <el-table-column
+              v-if="isColumnVisible('email')"
+              label="邮箱"
+              prop="email"
+              min-width="180"
+              show-overflow-tooltip
+            />
+            <el-table-column
+              v-if="isColumnVisible('createTime')"
+              label="创建时间"
+              prop="createTime"
+              width="160"
+              show-overflow-tooltip
+            />
             <el-table-column label="操作" fixed="right" width="200">
               <template #default="scope">
                 <div>
@@ -201,11 +262,11 @@
     </div>
 
     <!-- 用户表单 -->
-    <el-drawer
+    <el-dialog
       v-model="dialogState.visible"
       :title="dialogState.title"
       append-to-body
-      :size="drawerSize"
+      :width="dialogWidth"
       @close="closeDialog"
     >
       <el-form ref="userFormRef" :model="formData" :rules="rules" label-width="80px">
@@ -273,7 +334,7 @@
           <el-button @click="closeDialog">取 消</el-button>
         </div>
       </template>
-    </el-drawer>
+    </el-dialog>
 
     <!-- 重置密码 -->
     <el-dialog
@@ -407,7 +468,24 @@ const resetPasswordForm = reactive<ResetPasswordForm>({
 const deptOptions = ref<OptionItem[]>([]);
 const roleOptions = ref<OptionItem[]>([]);
 
-const drawerSize = computed(() => (appStore.device === DeviceEnum.DESKTOP ? "600px" : "90%"));
+const dialogWidth = computed(() => (appStore.device === DeviceEnum.DESKTOP ? "600px" : "90%"));
+
+const configurableColumns = [
+  { key: "nickname", label: "昵称" },
+  { key: "username", label: "用户名" },
+  { key: "status", label: "状态" },
+  { key: "gender", label: "性别" },
+  { key: "deptName", label: "部门" },
+  { key: "roleNames", label: "角色" },
+  { key: "mobile", label: "手机号码" },
+  { key: "email", label: "邮箱" },
+  { key: "createTime", label: "创建时间" },
+] as const;
+
+type ConfigurableColumnKey = (typeof configurableColumns)[number]["key"];
+
+const defaultVisibleColumns = configurableColumns.map((column) => column.key);
+const visibleColumns = ref<ConfigurableColumnKey[]>([...defaultVisibleColumns]);
 
 const resetPasswordDialogWidth = computed(() =>
   appStore.device === DeviceEnum.DESKTOP ? "420px" : "90%"
@@ -428,6 +506,14 @@ const resetPasswordRules: FormRules<ResetPasswordForm> = {
     { min: 6, message: "密码至少需要6位字符", trigger: "blur" },
   ],
 };
+
+function isColumnVisible(column: ConfigurableColumnKey): boolean {
+  return visibleColumns.value.includes(column);
+}
+
+function resetVisibleColumns(): void {
+  visibleColumns.value = [...defaultVisibleColumns];
+}
 
 /**
  * 取昵称/用户名首字母作为头像占位文本。
@@ -665,6 +751,27 @@ onMounted(() => {
     color: var(--el-color-primary);
     background: var(--el-color-primary-light-9);
     border-radius: 50%;
+  }
+}
+
+.column-setting {
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+
+    :deep(.el-checkbox) {
+      margin-right: 0;
+    }
   }
 }
 </style>

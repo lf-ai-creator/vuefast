@@ -59,7 +59,9 @@ class DeptService:
             tree = []
             for d in depts:
                 if d["parentId"] == parent_id:
-                    node = {"value": d["id"], "label": d["name"]}
+                    # 下拉选项与其他 BigId 响应保持一致，统一输出字符串，
+                    # 否则前端表单的字符串 parentId 无法匹配数字 value。
+                    node = {"value": str(d["id"]), "label": d["name"]}
                     children = _build(d["id"])
                     if children:
                         node["children"] = children

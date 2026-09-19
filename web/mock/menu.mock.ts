@@ -437,7 +437,7 @@ export default defineMock([
           children: [
             {
               path: "route-param-type1",
-              component: "demo/route-param",
+              component: "demo/route/route-param",
               name: "RouteParamType1",
               meta: {
                 title: "参数(type=1)",
@@ -452,7 +452,7 @@ export default defineMock([
             },
             {
               path: "route-param-type2",
-              component: "demo/route-param",
+              component: "demo/route/route-param",
               name: "RouteParamType2",
               meta: {
                 title: "参数(type=2)",
@@ -1520,7 +1520,7 @@ export default defineMock([
               type: "M",
               routeName: null,
               routePath: "route-param-type1",
-              component: "demo/route-param",
+              component: "demo/route/route-param",
               sort: 1,
               visible: 1,
               icon: "el-icon-Star",
@@ -1535,7 +1535,7 @@ export default defineMock([
               type: "M",
               routeName: null,
               routePath: "route-param-type2",
-              component: "demo/route-param",
+              component: "demo/route/route-param",
               sort: 2,
               visible: 1,
               icon: "el-icon-StarFilled",

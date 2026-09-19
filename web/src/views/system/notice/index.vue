@@ -196,66 +196,97 @@
 
     <el-dialog
       v-model="dialogState.visible"
-      :show-close="false"
+      :show-close="true"
       :fullscreen="dialogState.fullscreen"
-      top="6vh"
-      width="70%"
-      custom-class="notice-dialog"
+      class="notice-form-dialog"
+      top="5vh"
+      width="820px"
+      append-to-body
       @close="closeDialog"
     >
       <template #header>
-        <div class="flex-x-between">
-          <span>{{ dialogState.title }}</span>
-          <div class="dialog-toolbar">
-            <el-button circle @click="toggleDialogFullscreen">
+        <div class="notice-form-dialog__header">
+          <span class="notice-form-dialog__title">{{ dialogState.title }}</span>
+          <el-tooltip
+            :content="dialogState.fullscreen ? '退出全屏' : '全屏显示'"
+            placement="bottom"
+          >
+            <el-button
+              class="notice-form-dialog__fullscreen"
+              text
+              circle
+              :aria-label="dialogState.fullscreen ? '退出全屏' : '全屏显示'"
+              @click="toggleDialogFullscreen"
+            >
               <template #icon>
                 <FullScreen v-if="!dialogState.fullscreen" />
                 <CopyDocument v-else />
               </template>
             </el-button>
-            <el-button circle @click="closeDialog">
-              <template #icon>
-                <Close />
-              </template>
-            </el-button>
-          </div>
+          </el-tooltip>
         </div>
       </template>
-      <el-form ref="noticeFormRef" :model="formData" :rules="rules" label-width="100px">
-        <el-form-item label="通知标题" prop="title">
-          <el-input v-model="formData.title" placeholder="通知标题" clearable />
-        </el-form-item>
-
-        <el-form-item label="通知类型" prop="type">
-          <DictSelect v-model="formData.type" code="notice_type" />
-        </el-form-item>
-        <el-form-item label="通知等级" prop="level">
-          <DictSelect v-model="formData.level" code="notice_level" />
-        </el-form-item>
-        <el-form-item label="目标类型" prop="targetType">
-          <el-radio-group v-model="formData.targetType">
-            <el-radio :value="NOTICE_TARGET_ALL">全体</el-radio>
-            <el-radio :value="NOTICE_TARGET_SPECIFIED">指定</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item
-          v-if="formData.targetType === NOTICE_TARGET_SPECIFIED"
-          label="指定用户"
-          prop="targetUsers"
+      <div class="notice-form-dialog__scroll">
+        <el-form
+          ref="noticeFormRef"
+          class="notice-form"
+          :model="formData"
+          :rules="rules"
+          label-position="top"
         >
-          <el-select v-model="formData.targetUsers" multiple search placeholder="请选择指定用户">
-            <el-option
-              v-for="item in userOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+          <el-form-item class="notice-form__full" label="通知标题" prop="title">
+            <el-input
+              v-model="formData.title"
+              maxlength="100"
+              placeholder="请输入通知标题"
+              show-word-limit
+              clearable
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="通知内容" prop="content">
-          <WangEditor v-model="formData.content" height="350px" />
-        </el-form-item>
-      </el-form>
+          </el-form-item>
+
+          <el-form-item label="通知类型" prop="type">
+            <DictSelect v-model="formData.type" code="notice_type" />
+          </el-form-item>
+          <el-form-item label="通知等级" prop="level">
+            <DictSelect v-model="formData.level" code="notice_level" />
+          </el-form-item>
+          <el-form-item class="notice-form__full" label="接收范围" prop="targetType">
+            <el-radio-group v-model="formData.targetType">
+              <el-radio :value="NOTICE_TARGET_ALL">全体用户</el-radio>
+              <el-radio :value="NOTICE_TARGET_SPECIFIED">指定用户</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item
+            v-if="formData.targetType === NOTICE_TARGET_SPECIFIED"
+            class="notice-form__full"
+            label="指定用户"
+            prop="targetUsers"
+          >
+            <el-select
+              v-model="formData.targetUsers"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择接收用户"
+            >
+              <el-option
+                v-for="item in userOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item
+            class="notice-form__full notice-form__content"
+            label="通知内容"
+            prop="content"
+          >
+            <WangEditor v-model="formData.content" height="320px" />
+          </el-form-item>
+        </el-form>
+      </div>
       <template #footer>
         <div class="dialog-footer">
           <el-button type="primary" @click="handleSubmit()">确定</el-button>
@@ -263,60 +294,13 @@
         </div>
       </template>
     </el-dialog>
-    <el-dialog
-      v-model="detailDialog.visible"
-      :show-close="false"
-      width="50%"
-      append-to-body
-      @close="closeDetailDialog"
-    >
-      <template #header>
-        <div class="flex-x-between">
-          <span>通知公告详情</span>
-          <div class="dialog-toolbar">
-            <el-button circle @click="closeDetailDialog">
-              <template #icon>
-                <Close />
-              </template>
-            </el-button>
-          </div>
-        </div>
-      </template>
-      <el-descriptions :column="1">
-        <el-descriptions-item label="标题：">
-          {{ currentNotice.title }}
-        </el-descriptions-item>
-        <el-descriptions-item label="发布状态：">
-          <el-tag v-if="currentNotice.publishStatus === NOTICE_STATUS_DRAFT" type="info">
-            未发布
-          </el-tag>
-          <el-tag
-            v-else-if="currentNotice.publishStatus === NOTICE_STATUS_PUBLISHED"
-            type="success"
-          >
-            已发布
-          </el-tag>
-          <el-tag v-else-if="currentNotice.publishStatus === NOTICE_STATUS_REVOKED" type="warning">
-            已撤回
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="发布人：">
-          {{ currentNotice.publisherName }}
-        </el-descriptions-item>
-        <el-descriptions-item label="发布时间：">
-          {{ formatNoticeTime(currentNotice.publishTime) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="公告内容：">
-          <div class="notice-content" v-html="currentNotice.content" />
-        </el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
+    <NoticeDetailDialog v-model="detailDialog.visible" :detail="currentNotice" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
-import { Close, CopyDocument, FullScreen, Refresh } from "@element-plus/icons-vue";
+import { CopyDocument, FullScreen, Refresh } from "@element-plus/icons-vue";
 
 import NoticeAPI from "@/api/system/notice";
 import type { NoticeDetail, NoticeForm, NoticeItem, NoticeQueryParams } from "@/api/system/notice";
@@ -606,19 +590,129 @@ async function openDetailDialog(id: string): Promise<void> {
   detailDialog.visible = true;
 }
 
-/**
- * 关闭通知详情弹窗。
- */
-function closeDetailDialog(): void {
-  detailDialog.visible = false;
-}
-
 onMounted(() => {
   handleQuery();
 });
 </script>
 
 <style lang="scss" scoped>
+.notice-form-dialog__scroll {
+  max-height: calc(90vh - 132px);
+  padding: 20px 24px 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notice-form-dialog__header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 24px;
+}
+
+.notice-form-dialog__title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--el-dialog-title-font-size);
+  line-height: var(--el-dialog-font-line-height);
+  color: var(--el-text-color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-form-dialog__fullscreen {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: -4px 0 -4px auto !important;
+  font-size: var(--el-message-close-size, 16px);
+  color: var(--el-text-color-secondary);
+
+  &:hover {
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+  }
+}
+
+.notice-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+
+  &__full {
+    grid-column: 1 / -1;
+  }
+
+  :deep(.el-form-item) {
+    margin-bottom: 18px;
+  }
+
+  :deep(.el-form-item__label) {
+    height: auto;
+    padding-bottom: 7px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--el-text-color-primary);
+  }
+
+  :deep(.el-select) {
+    width: 100%;
+  }
+
+  &__content {
+    min-width: 0;
+    margin-bottom: 10px !important;
+  }
+}
+
+:global(.notice-form-dialog) {
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+}
+
+:global(.notice-form-dialog .el-dialog__body) {
+  padding: 0;
+}
+
+:global(.notice-form-dialog.is-fullscreen) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: none;
+}
+
+:global(.notice-form-dialog.is-fullscreen .el-dialog__header),
+:global(.notice-form-dialog.is-fullscreen .el-dialog__footer) {
+  flex-shrink: 0;
+}
+
+:global(.notice-form-dialog.is-fullscreen .el-dialog__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+:global(.notice-form-dialog.is-fullscreen .notice-form-dialog__scroll) {
+  box-sizing: border-box;
+  height: 100%;
+  max-height: none;
+}
+
+@media (max-width: 600px) {
+  .notice-form-dialog__scroll {
+    padding: 16px 16px 2px;
+  }
+
+  .notice-form {
+    grid-template-columns: minmax(0, 1fr);
+
+    &__full {
+      grid-column: auto;
+    }
+  }
+}
+
 .notice-time {
   display: flex;
   gap: 8px;
