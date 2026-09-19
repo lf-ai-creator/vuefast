@@ -19,7 +19,7 @@
           <el-tag v-else size="small" type="warning" effect="light">进行中</el-tag>
         </div>
         <div class="approval-flow__time">
-          <template v-if="record.endTime">办理于 {{ record.endTime }}</template>
+          <template v-if="record.endTime">办理于 {{ formatDateTime(record.endTime) }}</template>
           <template v-else>
             {{
               record.assignee ? `等待 ${record.assignee} 办理` : `待 ${describe(stage)} 认领办理`
@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import type { ApprovalHistoryItem, InstanceStatus, ProcessStageItem } from "@/api/workflow";
+import { formatDateTime } from "@/utils/format";
 
 defineOptions({
   name: "ApprovalFlowTimeline",

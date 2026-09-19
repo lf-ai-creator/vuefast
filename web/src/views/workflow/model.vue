@@ -117,7 +117,13 @@
               </template>
             </template>
           </el-table-column>
-          <el-table-column label="更新时间" prop="updateTime" width="170" align="center" />
+          <el-table-column
+            label="更新时间"
+            prop="updateTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column fixed="right" label="操作" align="center" width="210">
             <template #default="scope">
               <el-button
@@ -244,6 +250,7 @@ import type {
 import router from "@/router";
 import { hasPerm } from "@/utils/auth";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import BpmnViewer from "./components/BpmnViewer.vue";
 
 defineOptions({

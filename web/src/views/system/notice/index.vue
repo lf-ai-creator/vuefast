@@ -307,6 +307,7 @@ import type { NoticeDetail, NoticeForm, NoticeItem, NoticeQueryParams } from "@/
 import UserAPI from "@/api/system/user";
 import type { OptionItem } from "@/api/common";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 
 defineOptions({
   name: "Notice",
@@ -329,10 +330,7 @@ const NOTICE_TARGET_SPECIFIED = 2;
 
 function formatNoticeTime(value?: string | Date | null): string {
   if (!value) return "-";
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return formatDateTime(value) || "-";
 }
 
 /** 分页表格数据管理 */

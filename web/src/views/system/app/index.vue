@@ -104,7 +104,13 @@
             min-width="160"
             show-overflow-tooltip
           />
-          <el-table-column key="createTime" label="创建时间" prop="createTime" width="160" />
+          <el-table-column
+            key="createTime"
+            label="创建时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="160"
+          />
           <el-table-column fixed="right" label="操作" width="180">
             <template #default="scope">
               <el-button
@@ -224,6 +230,7 @@ import { useFullscreen } from "@vueuse/core";
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { FullScreen, Refresh } from "@element-plus/icons-vue";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import AppAPI from "@/api/system/app";
 import type { AppItem, AppForm, AppQueryParams, AppPlatform } from "@/api/system/app";
 import { CommonStatus } from "@/enums";

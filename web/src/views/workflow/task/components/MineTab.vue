@@ -63,10 +63,16 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="发起时间" prop="startTime" width="170" align="center" />
+          <el-table-column
+            label="发起时间"
+            prop="startTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column label="结束时间" width="170" align="center">
             <template #default="scope">
-              {{ (scope.row as WorkflowInstanceItem).endTime || "-" }}
+              {{ formatDateTime((scope.row as WorkflowInstanceItem).endTime) || "-" }}
             </template>
           </el-table-column>
           <el-table-column
@@ -135,6 +141,7 @@ import type {
   WorkflowInstanceQueryParams,
 } from "@/api/workflow";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import InstanceDetailDrawer from "../../components/InstanceDetailDrawer.vue";
 
 defineOptions({

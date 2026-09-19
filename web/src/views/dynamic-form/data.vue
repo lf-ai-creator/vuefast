@@ -62,7 +62,13 @@
             </template>
           </el-table-column>
           <el-table-column label="版本" prop="formVersion" width="70" align="center" />
-          <el-table-column label="提交时间" prop="createTime" width="170" align="center" />
+          <el-table-column
+            label="提交时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column fixed="right" label="操作" align="center" width="140">
             <template #default="scope">
               <el-button
@@ -102,7 +108,9 @@
         <el-descriptions-item label="提交人">
           {{ detailRow.createByName || "匿名" }}
         </el-descriptions-item>
-        <el-descriptions-item label="提交时间">{{ detailRow.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="提交时间">
+          {{ formatDateTime(detailRow.createTime) }}
+        </el-descriptions-item>
         <el-descriptions-item label="表单版本">v{{ detailRow.formVersion }}</el-descriptions-item>
       </el-descriptions>
 
@@ -126,6 +134,7 @@ import type { Column } from "exceljs";
 import FormAPI from "@/api/form";
 import type { FormDataItem, FormDataQueryParams } from "@/api/form";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import { downloadFile } from "@/utils";
 import {
   extractFields,

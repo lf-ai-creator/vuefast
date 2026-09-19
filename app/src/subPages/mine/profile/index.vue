@@ -28,7 +28,7 @@
           <wd-cell title="部门" :value="userProfile.deptName" />
           <wd-cell title="角色" :value="userProfile.roleNames" />
           <view class="profile-last-cell-wrap">
-            <wd-cell title="创建日期" :value="userProfile.createTime" />
+            <wd-cell title="创建日期" :value="formatDateTime(userProfile.createTime)" />
           </view>
         </wd-cell-group>
       </wd-card>
@@ -78,6 +78,7 @@ import UserAPI, { type UserProfile, UserProfileForm } from "@/api/user";
 import FileAPI, { type FileInfo } from "@/api/file";
 import { checkLogin } from "@/utils/auth";
 import { getErrorMessage } from "@/utils/error";
+import { formatDateTime } from "@/utils/format";
 import { toFormSchema } from "@/utils/form-schema";
 
 definePage({

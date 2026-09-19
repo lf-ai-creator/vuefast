@@ -70,7 +70,12 @@
           </el-table-column>
           <el-table-column label="排序" prop="sort" width="80" align="center" />
           <el-table-column label="备注" prop="remark" min-width="140" />
-          <el-table-column label="创建时间" prop="createTime" width="180" />
+          <el-table-column
+            label="创建时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="180"
+          />
           <el-table-column fixed="right" label="操作" width="240">
             <template #default="scope">
               <el-button
@@ -240,6 +245,7 @@ import type {
 } from "@/api/system/tenant-plan";
 import type { OptionItem } from "@/api/common";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import { CommonStatus } from "@/enums";
 import { MenuScopeEnum } from "@/enums/business";
 

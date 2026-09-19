@@ -152,7 +152,12 @@
               prop="username"
               show-overflow-tooltip
             />
-            <el-table-column v-if="isColumnVisible('status')" label="状态" align="center" width="80">
+            <el-table-column
+              v-if="isColumnVisible('status')"
+              label="状态"
+              align="center"
+              width="80"
+            >
               <template #default="scope">
                 <el-tag
                   :type="scope.row.status === CommonStatus.ENABLED ? 'success' : 'danger'"
@@ -162,7 +167,12 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('gender')" label="性别" align="center" width="70">
+            <el-table-column
+              v-if="isColumnVisible('gender')"
+              label="性别"
+              align="center"
+              width="70"
+            >
               <template #default="scope">
                 <el-tag
                   v-if="
@@ -211,6 +221,7 @@
               v-if="isColumnVisible('createTime')"
               label="创建时间"
               prop="createTime"
+              :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
               width="160"
               show-overflow-tooltip
             />
@@ -398,6 +409,7 @@ import type { UserForm, UserItem, UserQueryParams } from "@/api/system/user";
 import type { OptionItem } from "@/api/common";
 import { useAppStore, useUserStore } from "@/stores";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import { CommonStatus, DeviceEnum, DialogMode, UserGender } from "@/enums";
 import { downloadFile } from "@/utils";
 

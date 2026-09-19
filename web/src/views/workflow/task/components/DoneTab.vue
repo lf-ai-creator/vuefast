@@ -58,7 +58,13 @@
             min-width="200"
             show-overflow-tooltip
           />
-          <el-table-column label="办理时间" prop="endTime" width="170" align="center" />
+          <el-table-column
+            label="办理时间"
+            prop="endTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column label="处理意见" prop="comment" min-width="160" show-overflow-tooltip>
             <template #default="scope">
               {{ (scope.row as DoneTaskItem).comment || "-" }}
@@ -101,6 +107,7 @@ import { Refresh } from "@element-plus/icons-vue";
 import WorkflowAPI from "@/api/workflow";
 import type { DoneTaskItem, WorkflowTaskQueryParams } from "@/api/workflow";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import InstanceDetailDrawer from "../../components/InstanceDetailDrawer.vue";
 
 defineOptions({

@@ -37,7 +37,12 @@
         <el-table-column label="描述" prop="tableComment" width="150" />
         <el-table-column label="存储引擎" align="center" prop="engine" />
         <el-table-column label="排序规则" align="center" prop="tableCollation" />
-        <el-table-column label="创建时间" align="center" prop="createTime" />
+        <el-table-column
+          label="创建时间"
+          align="center"
+          prop="createTime"
+          :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+        />
         <el-table-column fixed="right" label="操作" width="200">
           <template #default="scope">
             <el-button
@@ -82,6 +87,7 @@ import { ElMessage, ElMessageBox, type FormInstance } from "element-plus";
 import GeneratorAPI from "@/api/codegen";
 import type { TableItem, TableQueryParams } from "@/api/codegen";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 
 /** 表已配置代码生成（1:是;0:否）。 */
 const TABLE_CONFIGURED = 1;

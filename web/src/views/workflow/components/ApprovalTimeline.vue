@@ -3,7 +3,7 @@
     <el-timeline-item
       v-for="(item, index) in history"
       :key="index"
-      :timestamp="item.startTime"
+      :timestamp="formatDateTime(item.startTime)"
       :type="item.endTime ? 'success' : 'primary'"
       placement="top"
     >
@@ -14,7 +14,9 @@
         <el-tag v-if="!item.endTime" size="small" type="warning" effect="plain">进行中</el-tag>
       </div>
       <div v-if="item.comment" class="approval-timeline__comment">{{ item.comment }}</div>
-      <div v-if="item.endTime" class="approval-timeline__time">办理于 {{ item.endTime }}</div>
+      <div v-if="item.endTime" class="approval-timeline__time">
+        办理于 {{ formatDateTime(item.endTime) }}
+      </div>
     </el-timeline-item>
   </el-timeline>
   <el-empty v-else description="暂无审批记录" :image-size="64" />
@@ -22,6 +24,7 @@
 
 <script setup lang="ts">
 import type { ApprovalHistoryItem } from "@/api/workflow";
+import { formatDateTime } from "@/utils/format";
 
 defineOptions({
   name: "ApprovalTimeline",

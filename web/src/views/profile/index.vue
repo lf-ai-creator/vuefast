@@ -41,7 +41,7 @@
             </span>
             <span class="profile-hero__meta-item">
               <el-icon><Location /></el-icon>
-              最近登录 {{ recentLoginRecords[0]?.time }}
+              最近登录 {{ formatDateTime(recentLoginRecords[0]?.time) || "-" }}
             </span>
           </div>
         </div>
@@ -178,7 +178,7 @@
                   <strong class="profile-login__device">{{ record.device }}</strong>
                   <span class="profile-login__meta">{{ record.location }} / {{ record.ip }}</span>
                 </div>
-                <time class="profile-login__time">{{ record.time }}</time>
+                <time class="profile-login__time">{{ formatDateTime(record.time) }}</time>
               </div>
               <div v-if="!loginRecordsLoading && !recentLoginRecords.length" class="profile-empty">
                 暂无登录记录
@@ -338,6 +338,7 @@ import type { Component } from "vue";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import FileAPI from "@/api/file";
 import { useUserStoreHook } from "@/stores";
+import { formatDateTime } from "@/utils/format";
 
 import {
   Calendar,
@@ -494,9 +495,7 @@ const displayName = computed(() => {
 const roleList = computed(() => {
   const roleNames = userProfile.value.roleNames;
   const roles = Array.isArray(roleNames) ? roleNames : (roleNames || "").split(/[,，]/);
-  return roles
-    .map((role) => role.trim())
-    .filter(Boolean);
+  return roles.map((role) => role.trim()).filter(Boolean);
 });
 
 const primaryRole = computed(() => roleList.value[0] || "普通用户");
@@ -702,7 +701,7 @@ const securityItems = computed<SecurityItem[]>(() => [
 ]);
 
 function formatValue(value?: Date | string) {
-  return value ? String(value) : "-";
+  return formatDateTime(value) || "-";
 }
 
 function getPromptValue(result: unknown) {

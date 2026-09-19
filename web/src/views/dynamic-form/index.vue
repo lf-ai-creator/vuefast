@@ -98,7 +98,13 @@
             </template>
           </el-table-column>
           <el-table-column label="版本" prop="version" width="70" align="center" />
-          <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+          <el-table-column
+            label="创建时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column fixed="right" label="操作" align="center" width="330">
             <template #default="scope">
               <el-button
@@ -257,6 +263,7 @@ import FormAPI from "@/api/form";
 import type { FormDefinitionData, FormDefinitionItem, FormDefinitionQueryParams } from "@/api/form";
 import router from "@/router";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import { FormStatus } from "@/enums";
 import FormPublishDialog from "./components/PublishDialog.vue";
 

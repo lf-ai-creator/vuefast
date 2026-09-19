@@ -12,8 +12,12 @@
             {{ statusOptions[detail.status].label }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="发起时间">{{ detail.startTime }}</el-descriptions-item>
-        <el-descriptions-item label="结束时间">{{ detail.endTime || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="发起时间">
+          {{ formatDateTime(detail.startTime) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="结束时间">
+          {{ formatDateTime(detail.endTime) || "-" }}
+        </el-descriptions-item>
         <el-descriptions-item label="终止原因">
           {{ detail.deleteReason || "-" }}
         </el-descriptions-item>
@@ -64,6 +68,7 @@ import type { InstanceDetailData, InstanceStatus, ProcessDiagramData } from "@/a
 import ApprovalFlowTimeline from "./ApprovalFlowTimeline.vue";
 import BpmnViewer from "./BpmnViewer.vue";
 import FormDetail from "./FormDetail.vue";
+import { formatDateTime } from "@/utils/format";
 
 defineOptions({
   name: "InstanceDetailDrawer",

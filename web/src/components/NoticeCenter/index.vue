@@ -36,14 +36,20 @@
             v-for="item in list"
             :key="item.id"
             :class="['notice__item', { 'is-read': item.isRead === 1 }]"
+            role="button"
+            tabindex="0"
+            :aria-label="`查看通知：${item.title}`"
+            @click="read(item.id)"
+            @keydown.enter.prevent="read(item.id)"
+            @keydown.space.prevent="read(item.id)"
           >
             <DictTag v-model="item.type" code="notice_type" size="small" />
-            <el-text size="small" class="notice__title" truncated @click="read(item.id)">
+            <el-text size="small" class="notice__title" truncated>
               {{ item.title }}
             </el-text>
 
             <div class="notice__time">
-              {{ item.publishTime }}
+              {{ formatDateTime(item.publishTime) }}
             </div>
           </div>
         </div>
@@ -72,6 +78,7 @@
 
 <script setup lang="ts">
 import { useNotice } from "./useNotice";
+import { formatDateTime } from "@/utils/format";
 
 const {
   list,
@@ -209,6 +216,15 @@ function handleVisibleChange(visible: boolean) {
     gap: 8px;
     align-items: center;
     padding: 10px 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--el-fill-color-light);
+      outline: none;
+    }
 
     & + & {
       border-top: 1px solid var(--el-border-color-lighter);

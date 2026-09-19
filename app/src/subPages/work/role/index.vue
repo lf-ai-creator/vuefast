@@ -39,7 +39,7 @@
 
         <!-- 元信息行 -->
         <view class="role-card__footer">
-          <text class="item-time">{{ item.createTime }}</text>
+          <text class="item-time">{{ formatDateTime(item.createTime) }}</text>
           <view
             class="item-action"
             hover-class="item-action--hover"
@@ -127,6 +127,7 @@
 <script lang="ts" setup>
 import { onLoad } from "@dcloudio/uni-app";
 import { toFormSchema } from "@/utils/form-schema";
+import { formatDateTime } from "@/utils/format";
 import { useToast } from "@wot-ui/ui";
 import { useActionSheet, type ActionMenuOption } from "@/composables/useActionSheet";
 import { usePagedList } from "@/composables/usePagedList";

@@ -87,8 +87,18 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="过期时间" prop="expireTime" width="160" />
-          <el-table-column label="创建时间" prop="createTime" width="160" />
+          <el-table-column
+            label="过期时间"
+            prop="expireTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="160"
+          />
+          <el-table-column
+            label="创建时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="160"
+          />
           <el-table-column fixed="right" label="操作" width="320">
             <template #default="scope">
               <el-tooltip
@@ -381,6 +391,7 @@ import { CommonStatus, MenuScopeEnum } from "@/enums";
 import { hasPerm } from "@/utils/auth";
 import { isPlatformTenantId } from "@/utils/tenant";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 
 defineOptions({
   name: "Tenant",

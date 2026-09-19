@@ -79,7 +79,7 @@
             </template>
           </wd-cell>
           <wd-cell title="发布人" :value="noticeDetail.publisherName" />
-          <wd-cell title="发布时间" :value="String(noticeDetail.publishTime || '-')" />
+          <wd-cell title="发布时间" :value="formatDateTime(noticeDetail.publishTime) || '-'" />
         </wd-cell-group>
         <view class="mt-4 p-4 bg-[var(--color-fill-1)] rounded-lg">
           <rich-text :nodes="noticeDetail.content" class="text-28rpx" />
@@ -167,6 +167,7 @@ import NoticeAPI, {
   NoticeForm,
 } from "@/api/notice";
 import { hasPermission } from "@/utils/permission";
+import { formatDateTime } from "@/utils/format";
 
 definePage({
   name: "notice",
@@ -236,10 +237,10 @@ const getLevelText = (level?: string | number): string => {
 // 格式化时间
 const formatTime = (item: NoticeItem): string => {
   if (item.publishStatus === 1 && item.publishTime) {
-    return String(item.publishTime);
+    return formatDateTime(item.publishTime);
   }
   if (item.publishStatus === -1 && item.revokeTime) {
-    return String(item.revokeTime);
+    return formatDateTime(item.revokeTime);
   }
   return "-";
 };

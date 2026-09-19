@@ -42,7 +42,7 @@
 
         <!-- 元信息行 -->
         <view class="flex-between mt-16rpx">
-          <text class="item-time">{{ item.createTime }}</text>
+          <text class="item-time">{{ formatDateTime(item.createTime) }}</text>
           <view
             class="item-action"
             hover-class="item-action--hover"
@@ -69,7 +69,7 @@
         <wd-cell-group border>
           <wd-cell title="操作标题" :value="logDetail.title" />
           <wd-cell title="操作人" :value="logDetail.operatorName" />
-          <wd-cell title="操作时间" :value="logDetail.createTime" />
+          <wd-cell title="操作时间" :value="formatDateTime(logDetail.createTime)" />
           <wd-cell title="状态">
             <template #value>
               <wd-tag :type="logDetail.status === 1 ? 'success' : 'danger'" size="small">
@@ -99,6 +99,7 @@
 import { onLoad } from "@dcloudio/uni-app";
 import { usePagedList } from "@/composables/usePagedList";
 import LogAPI, { type LogPageQuery, LogItem } from "@/api/log";
+import { formatDateTime } from "@/utils/format";
 
 definePage({
   name: "log",

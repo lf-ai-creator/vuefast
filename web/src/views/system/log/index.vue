@@ -82,7 +82,12 @@
           </el-table-column>
           <el-table-column label="执行时间(ms)" prop="executionTime" width="120" align="center" />
           <el-table-column label="操作人" prop="operatorName" width="120" />
-          <el-table-column label="操作时间" prop="createTime" width="180" />
+          <el-table-column
+            label="操作时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="180"
+          />
           <el-table-column label="操作" width="80" align="center" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" link size="small" @click="handleDetail(row as LogItem)">
@@ -155,7 +160,9 @@
           {{ detailData.executionTime }}ms
         </el-descriptions-item>
         <el-descriptions-item label="操作人">{{ detailData.operatorName }}</el-descriptions-item>
-        <el-descriptions-item label="操作时间">{{ detailData.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="操作时间">
+          {{ formatDateTime(detailData.createTime) }}
+        </el-descriptions-item>
         <el-descriptions-item label="IP地址">{{ detailData.ip }}</el-descriptions-item>
         <el-descriptions-item label="请求方法">{{ detailData.requestMethod }}</el-descriptions-item>
         <el-descriptions-item label="请求路径" :span="2">
@@ -183,6 +190,7 @@ import { FullScreen, Refresh } from "@element-plus/icons-vue";
 import LogAPI from "@/api/system/log";
 import type { LogItem, LogQueryParams } from "@/api/system/log";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import { useUserStore } from "@/stores";
 
 defineOptions({

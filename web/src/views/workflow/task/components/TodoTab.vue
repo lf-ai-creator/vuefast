@@ -58,7 +58,13 @@
             min-width="200"
             show-overflow-tooltip
           />
-          <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+          <el-table-column
+            label="创建时间"
+            prop="createTime"
+            :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
+            width="170"
+            align="center"
+          />
           <el-table-column fixed="right" label="操作" align="center" width="100">
             <template #default="scope">
               <el-button
@@ -175,6 +181,7 @@ import type {
   WorkflowTaskQueryParams,
 } from "@/api/workflow";
 import { usePageTable } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import ApprovalTimeline from "../../components/ApprovalTimeline.vue";
 import FormDetail from "../../components/FormDetail.vue";
 import ProcessStages from "../../components/ProcessStages.vue";

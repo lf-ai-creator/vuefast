@@ -3,6 +3,26 @@
  */
 
 /**
+ * 统一格式化日期时间到分钟级别。
+ * 仅用于界面展示，不会修改接口返回值。
+ */
+export function formatDateTime(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "";
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    const pad = (part: number) => String(part).padStart(2, "0");
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  }
+
+  const text = String(value).trim();
+  if (!text) return "";
+  const normalized = text.replace("T", " ").replace(/Z$/, "");
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}))?/);
+  return match ? `${match[1]}${match[2] ? ` ${match[2]}` : ""}` : text;
+}
+
+/**
  * 格式化增长率
  * 保留两位小数，去掉末尾的 0，取绝对值
  *
