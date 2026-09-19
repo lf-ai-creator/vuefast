@@ -265,8 +265,8 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 }
 
 .command-palette-results {
-  max-height: min(48vh, 420px);
   min-height: 72px;
+  max-height: min(48vh, 420px);
   padding: 2px;
   overflow: auto;
   scrollbar-width: thin;
@@ -274,8 +274,8 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 
 .command-palette-empty {
   display: grid;
-  min-height: 72px;
   place-items: center;
+  min-height: 72px;
   padding: 16px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
@@ -284,10 +284,10 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 
 .command-palette-empty__icon {
   display: grid;
+  place-items: center;
   width: 28px;
   height: 28px;
   margin-bottom: 6px;
-  place-items: center;
   color: var(--el-text-color-placeholder);
   background: var(--el-fill-color-light);
   border-radius: 50%;
@@ -313,9 +313,9 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
   padding: 0 8px 4px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--el-text-color-placeholder);
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .command-palette-list__label span {
@@ -340,17 +340,17 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 .command-palette-item__main {
   display: flex;
   flex: 1;
-  min-width: 0;
-  align-items: center;
   gap: 10px;
+  align-items: center;
+  min-width: 0;
 }
 
 .command-palette-item__icon {
   display: grid;
   flex: 0 0 28px;
+  place-items: center;
   width: 28px;
   height: 28px;
-  place-items: center;
   color: var(--el-text-color-secondary);
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
@@ -376,29 +376,29 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 
 .command-palette-item__title {
   overflow: hidden;
-  font-weight: 500;
-  font-size: 14px;
-  color: var(--el-text-color-primary);
   text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
   white-space: nowrap;
 }
 
 .command-palette-item__path {
-  overflow: hidden;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .command-palette-item__arrow {
   display: grid;
   flex: 0 0 24px;
+  place-items: center;
   width: 24px;
   height: 24px;
   margin-left: 8px;
-  place-items: center;
   color: var(--el-text-color-placeholder);
   opacity: 0;
   transition:
@@ -453,9 +453,9 @@ const handleInputKeydown: (evt: KeyboardEvent | Event) => void = (evt) => {
 
 @media (max-width: 768px) {
   .command-palette-trigger {
+    justify-content: center;
     width: 32px;
     padding: 0;
-    justify-content: center;
     background: transparent;
     border-color: transparent;
   }

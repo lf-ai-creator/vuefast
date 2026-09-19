@@ -312,11 +312,11 @@
 
 .el-dialog {
   --el-dialog-padding-primary: 14px;
-
-  overflow: hidden;
   // Element Plus 的基础样式可能在插件样式之后加载，这里明确清除容器留白，
   // 让头部和底部背景、分隔线直接连接弹窗边框。
   padding: 0 !important;
+
+  overflow: hidden;
   background-color: var(--el-bg-color);
   border: 1px solid color-mix(in srgb, var(--el-border-color) 78%, transparent);
   border-radius: 12px;
@@ -327,11 +327,11 @@
 
   .el-dialog__header {
     display: flex;
+    gap: 8px;
+    align-items: center;
     min-height: 40px;
     padding: 0 40px 0 14px;
     margin: 0;
-    align-items: center;
-    gap: 8px;
     background-color: color-mix(in srgb, var(--el-fill-color-light) 55%, var(--el-bg-color));
     border-bottom: 1px solid var(--el-border-color-lighter);
   }
@@ -340,11 +340,11 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 15px;
     font-weight: 600;
     line-height: 22px;
     color: var(--el-text-color-primary);
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -360,8 +360,8 @@
       background-color var(--el-transition-duration-fast);
 
     .el-dialog__close {
-      color: var(--el-text-color-secondary);
       font-size: 16px;
+      color: var(--el-text-color-secondary);
     }
 
     &:hover {
@@ -384,8 +384,8 @@
     border-top: 1px solid var(--el-border-color-lighter);
 
     .dialog-footer {
-      width: 100%;
       gap: 8px;
+      width: 100%;
     }
 
     .el-button {
@@ -485,16 +485,17 @@
 
   .el-drawer__title {
     overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 15px;
     font-weight: 600;
     line-height: 22px;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .el-drawer__close-btn {
     display: inline-grid;
     flex: 0 0 28px;
+    place-items: center;
     width: 28px;
     height: 28px;
     padding: 0;
@@ -503,7 +504,6 @@
     transition:
       color var(--el-transition-duration-fast),
       background-color var(--el-transition-duration-fast);
-    place-items: center;
 
     &:hover {
       color: var(--el-text-color-primary);
@@ -523,8 +523,8 @@
     border-top: 1px solid var(--el-border-color-lighter);
 
     .dialog-footer {
-      width: 100%;
       gap: 8px;
+      width: 100%;
     }
 
     .el-button {

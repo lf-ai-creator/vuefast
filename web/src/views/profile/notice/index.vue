@@ -228,8 +228,8 @@ onMounted(() => {
 
 @media (max-width: 600px) {
   .notice-toolbar {
-    align-items: flex-start;
     gap: 8px;
+    align-items: flex-start;
   }
 
   .notice-toolbar__summary {

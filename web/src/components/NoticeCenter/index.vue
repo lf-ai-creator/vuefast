@@ -222,8 +222,8 @@ function handleVisibleChange(visible: boolean) {
 
     &:hover,
     &:focus-visible {
-      background: var(--el-fill-color-light);
       outline: none;
+      background: var(--el-fill-color-light);
     }
 
     & + & {

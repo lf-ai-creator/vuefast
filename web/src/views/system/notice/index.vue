@@ -611,10 +611,10 @@ onMounted(() => {
 .notice-form-dialog__title {
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--el-dialog-title-font-size);
   line-height: var(--el-dialog-font-line-height);
   color: var(--el-text-color-primary);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -676,8 +676,8 @@ onMounted(() => {
 :global(.notice-form-dialog.is-fullscreen) {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   max-width: none;
+  height: 100vh;
 }
 
 :global(.notice-form-dialog.is-fullscreen .el-dialog__header),

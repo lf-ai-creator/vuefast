@@ -129,20 +129,20 @@ function formatTime(value?: string | Date | null): string {
 
   &__header-icon {
     display: grid;
+    place-items: center;
     width: 32px;
     height: 32px;
     color: var(--el-color-primary);
     background: var(--el-color-primary-light-9);
     border: 1px solid var(--el-color-primary-light-8);
     border-radius: 8px;
-    place-items: center;
   }
 
   &__header-title {
     font-size: 15px;
     font-weight: 600;
-    letter-spacing: 0.2px;
     color: var(--el-text-color-primary);
+    letter-spacing: 0.2px;
   }
 }
 
@@ -273,8 +273,8 @@ function formatTime(value?: string | Date | null): string {
     }
 
     &__information {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
   }
 }
