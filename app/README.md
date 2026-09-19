@@ -70,3 +70,7 @@ pnpm lint:prettier
 ## 许可证
 
 本子工程采用 [MIT License](LICENSE)。
+
+## 来源与致谢
+
+本子工程来源于 [youlaiorg/youlai-app](https://gitee.com/youlaiorg/youlai-app)，在原项目基础上进行仓库整合、配置调整和功能适配。感谢原项目作者及所有贡献者。

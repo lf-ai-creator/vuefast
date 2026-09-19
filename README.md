@@ -107,4 +107,14 @@ ruff format .
 
 ## 许可证
 
-本项目整体采用 [MIT License](LICENSE) 开源协议。`web/` 和 `app/` 子工程已包含对应 MIT 许可证文件；后端 `server/` 与根项目保持一致。
+本项目由不同许可证的子项目组成：根项目及 `web/`、`app/` 子工程采用 [MIT License](LICENSE)，`server/` 后端采用 [Apache License 2.0](server/LICENSE)。使用或再发布时请遵守对应目录中的许可证条款。
+
+## 致谢与来源
+
+本项目基于以下开源项目进行整合、适配和二次开发，感谢原作者及贡献者的持续维护：
+
+- PC 管理端来源：[vue3-element-admin](https://gitee.com/youlaiorg/vue3-element-admin)
+- 移动端来源：[youlai-app](https://gitee.com/youlaiorg/youlai-app)
+- FastAPI 后端来源：[youlai-fastapi](https://gitee.com/youlaiorg/youlai-fastapi)
+
+各子项目 README 中分别记录了对应的具体来源。使用、再发布或二次开发时请保留原项目的版权和许可证声明。

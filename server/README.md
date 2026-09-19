@@ -101,10 +101,14 @@ ruff format .
 
 ## 许可证
 
-本项目采用 [MIT License](../LICENSE)。
+本后端子工程采用 [Apache License 2.0](LICENSE)。
 
 ## 相关工程
 
 - PC 管理端：[`../web`](../web)
 - 移动端：[`../app`](../app)
 - 全局说明：[`../README.md`](../README.md)
+
+## 来源与致谢
+
+本子工程来源于 [youlaiorg/youlai-fastapi](https://gitee.com/youlaiorg/youlai-fastapi)，在原项目基础上进行仓库整合、接口扩展和业务适配。感谢原项目作者及所有贡献者。
