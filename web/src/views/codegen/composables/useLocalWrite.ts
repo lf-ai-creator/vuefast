@@ -7,9 +7,11 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
   const writeDialog = reactive({ visible: false });
   const frontendDirHandle = ref<FileSystemDirectoryHandle | null>(null);
   const backendDirHandle = ref<FileSystemDirectoryHandle | null>(null);
+  const appDirHandle = ref<FileSystemDirectoryHandle | null>(null);
   const frontendDirPath = ref("");
   const backendDirPath = ref("");
-  const writeScope = ref<"all" | "frontend" | "backend">("all");
+  const appDirPath = ref("");
+  const writeScope = ref<"all" | "frontend" | "backend" | "app">("all");
   const overwriteMode = ref<"overwrite" | "skip" | "ifChanged">("overwrite");
   const writeProgress = reactive({ total: 0, done: 0, percent: 0, current: "" });
   const writeRunning = ref(false);
@@ -20,6 +22,9 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
   );
   const needBackend = computed(() =>
     lastPreviewFiles.value.some((f) => resolveRootForItem(f) === "backend")
+  );
+  const needApp = computed(() =>
+    lastPreviewFiles.value.some((f) => resolveRootForItem(f) === "app")
   );
   // 只要有预览文件就可以点写入按钮，目录在弹窗里选
   const canWriteToLocal = computed(() => lastPreviewFiles.value.length > 0);
@@ -52,6 +57,16 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
     }
   }
 
+  async function pickAppDir() {
+    try {
+      appDirHandle.value = await (window as any).showDirectoryPicker();
+      appDirPath.value = appDirHandle.value?.name || "";
+      ElMessage.success("App 目录选择成功");
+    } catch {
+      // 用户取消
+    }
+  }
+
   async function confirmWrite() {
     await writeGeneratedCode();
     writeDialog.visible = false;
@@ -59,12 +74,16 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
 
   // ---- 内部工具函数 ----
 
-  function resolveRootForItem(item: GeneratorPreviewItem): "frontend" | "backend" {
-    return item.scope === "backend" ? "backend" : "frontend";
+  function resolveRootForItem(item: GeneratorPreviewItem): "frontend" | "backend" | "app" {
+    return item.scope === "backend" ? "backend" : item.scope === "app" ? "app" : "frontend";
   }
 
-  function stripProjectRoot(p: string): string {
+  function stripProjectRoot(p: string, root: "frontend" | "backend" | "app"): string {
     const normalized = p.replace(/\\/g, "/");
+    const workspacePrefix = root === "frontend" ? "web/" : root === "backend" ? "server/" : "app/";
+    if (normalized.startsWith(workspacePrefix)) {
+      return normalized.slice(workspacePrefix.length);
+    }
     const frontApp = genConfigFormData.value.frontendAppName;
     const backApp = genConfigFormData.value.backendAppName;
     if (frontApp && normalized.startsWith(`${frontApp}/`))
@@ -146,7 +165,8 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
     }
     if (
       (needFrontend.value && !frontendDirHandle.value) ||
-      (needBackend.value && !backendDirHandle.value)
+      (needBackend.value && !backendDirHandle.value) ||
+      (needApp.value && !appDirHandle.value)
     ) {
       ElMessage.warning("请先选择所需的前/后端目录");
       return;
@@ -160,6 +180,7 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
     writeRunning.value = true;
     let frontCount = 0;
     let backCount = 0;
+    let appCount = 0;
     const failed: string[] = [];
 
     const files = lastPreviewFiles.value.filter(
@@ -180,11 +201,15 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
         try {
           await (async () => {
             const root = resolveRootForItem(item);
-            const relativePath = stripProjectRoot(`${item.path}/${item.fileName}`);
+            const relativePath = stripProjectRoot(`${item.path}/${item.fileName}`, root);
             writeProgress.current = relativePath;
 
             const targetRoot =
-              root === "frontend" ? frontendDirHandle.value : backendDirHandle.value;
+              root === "frontend"
+                ? frontendDirHandle.value
+                : root === "backend"
+                  ? backendDirHandle.value
+                  : appDirHandle.value;
 
             if (!targetRoot) return;
 
@@ -199,7 +224,8 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
 
             await writeFileToDir(targetRoot, relativePath, item.content || "");
             if (root === "frontend") frontCount++;
-            else backCount++;
+            else if (root === "backend") backCount++;
+            else appCount++;
           })().catch((err) => {
             console.error("写入失败:", item.path, err);
             failed.push(item.path);
@@ -217,10 +243,12 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
 
     if (failed.length) {
       ElMessage.warning(
-        `部分文件写入失败 ${failed.length} 个，成功 前端 ${frontCount} 个，后端 ${backCount} 个`
+        `部分文件写入失败 ${failed.length} 个，成功 Web ${frontCount} 个、App ${appCount} 个、后端 ${backCount} 个`
       );
     } else {
-      ElMessage.success(`写入完成：前端 ${frontCount} 个文件，后端 ${backCount} 个文件`);
+      ElMessage.success(
+        `写入完成：Web ${frontCount} 个、App ${appCount} 个、后端 ${backCount} 个文件`
+      );
     }
   }
 
@@ -229,6 +257,7 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
     writeDialog,
     frontendDirPath,
     backendDirPath,
+    appDirPath,
     writeScope,
     overwriteMode,
     writeProgress,
@@ -238,6 +267,7 @@ export function useLocalWrite(genConfigFormData: Ref<GenConfigForm>) {
     setPreviewFiles,
     pickFrontendDir,
     pickBackendDir,
+    pickAppDir,
     confirmWrite,
   };
 }

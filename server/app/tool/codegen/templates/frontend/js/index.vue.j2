@@ -2,7 +2,7 @@
   <div class="page-container">
     <el-card class="page-search" shadow="never">
       <el-form ref="queryFormRef" :model="params" :inline="true">
-{% for c in columns %}{% if c.is_show_in_query %}        <el-form-item label="[[ c.field_comment ]]" prop="[[ c.field_name ]]">
+{% for c in columns %}{% if c.is_show_in_query %}        <el-form-item label="[[ c.query_name ]]" prop="[[ c.field_name ]]">
 {% if c.form_type_name == "INPUT" %}          <el-input v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" clearable @keyup.enter="handleQuery()" />
 {% elif c.form_type_name == "SELECT" %}{% if c.dict_type %}          <DictSelect v-model="params.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
 {% else %}          <el-select v-model="params.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]">
@@ -22,8 +22,8 @@
 {% endif %}{% elif c.form_type_name == "INPUT_NUMBER" %}          <el-input-number v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
 {% elif c.form_type_name == "SWITCH" %}          <el-switch v-model="params.[[ c.field_name ]]" :active-value="1" :inactive-value="0" />
 {% elif c.form_type_name == "TEXT_AREA" %}          <el-input type="textarea" v-model="params.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "DATE_TIME" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="daterange" range-separator="~" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm:ss" />
-{% else %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm:ss" />
+{% elif c.form_type_name == "DATE_TIME" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="daterange" range-separator="~" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm" />
+{% else %}          <el-date-picker v-model="params.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm" />
 {% endif %}{% elif c.form_type_name == "DATE" %}{% if c.query_type_name == "BETWEEN" %}          <el-date-picker class="!w-[240px]" v-model="params.[[ c.field_name ]]" type="daterange" range-separator="~" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD" />
 {% else %}          <el-date-picker class="!w-[240px]" v-model="params.[[ c.field_name ]]" type="date" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD" />
 {% endif %}{% endif %}        </el-form-item>
@@ -38,7 +38,8 @@
       <div class="page-toolbar">
         <div class="page-toolbar__left">
           <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:create']" type="primary" @click="handleCreateClick()">新增</el-button>
-          <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" :disabled="!hasSelection" @click="handleBatchDelete()">删除</el-button>
+{% if delete_enabled and delete_type in ("single_batch", "batch") %}          <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" :disabled="!hasSelection" @click="handleBatchDelete()">删除</el-button>
+{% endif %}
         </div>
         <div class="page-toolbar__right">
           <el-tooltip content="刷新" placement="top">
@@ -53,14 +54,16 @@
       <div class="page-table-wrapper">
         <el-table ref="dataTableRef" v-loading="loading" class="page-table" :data="list" height="100%" border highlight-current-row @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-{% for c in columns %}{% if c.is_show_in_list %}{% if c.dict_type %}        <el-table-column label="[[ c.field_comment ]]" width="150" align="center">
+{% for c in columns %}{% if c.is_show_in_list %}{% if c.dict_type %}        <el-table-column label="[[ c.list_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %}>
           <template #default="scope"><DictTag v-model="scope.row.[[ c.field_name ]]" code="[[ c.dict_type ]]" /></template>
         </el-table-column>
-{% else %}        <el-table-column key="[[ c.field_name ]]" label="[[ c.field_comment ]]" prop="[[ c.field_name ]]" min-width="150" align="center" />
+{% elif c.form_type_name in ("DATE", "DATE_TIME") %}        <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="170"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} :formatter="(row, column, cellValue) => formatDateTime(cellValue)" />
+{% else %}        <el-table-column key="[[ c.field_name ]]" label="[[ c.list_name ]]" prop="[[ c.field_name ]]" {% if c.list_width %}width="[[ c.list_width ]]"{% else %}min-width="150"{% endif %} align="center"{% if c.list_ellipsis %} show-overflow-tooltip{% endif %} />
 {% endif %}{% endif %}{% endfor %}        <el-table-column fixed="right" label="操作" width="180">
           <template #default="scope">
             <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:update']" type="primary" size="small" link @click="handleEditClick(String(scope.row.id))">编辑</el-button>
-            <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" size="small" link @click="handleDelete(String(scope.row.id))">删除</el-button>
+{% if delete_enabled and delete_type in ("single_batch", "single") %}            <el-button v-hasPerm="['[[ module_name ]]:[[ entity_kebab ]]:delete']" type="danger" size="small" link @click="handleDelete(String(scope.row.id))">删除</el-button>
+{% endif %}
           </template>
         </el-table-column>
       </el-table>
@@ -86,9 +89,15 @@
             <el-checkbox :value="0">选项一</el-checkbox><el-checkbox :value="1">选项二</el-checkbox>
           </el-checkbox-group>
 {% endif %}{% elif c.form_type_name == "INPUT_NUMBER" %}          <el-input-number v-model="formData.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
+{% elif c.form_type_name == "BOOLEAN_SELECT" %}          <el-select v-model="formData.[[ c.field_name ]]" placeholder="请选择[[ c.field_comment ]]">
+            <el-option :value="1" label="是" /><el-option :value="0" label="否" />
+          </el-select>
+{% elif c.form_type_name == "DICT_SELECT" %}{% if c.dict_type %}          <DictSelect v-model="formData.[[ c.field_name ]]" code="[[ c.dict_type ]]" />
+{% else %}          <el-select v-model="formData.[[ c.field_name ]]" placeholder="请先配置字典" />
+{% endif %}{% elif c.form_type_name == "FILE_UPLOAD" %}          <FileUpload v-model="formData.[[ c.field_name ]]" />
 {% elif c.form_type_name == "SWITCH" %}          <el-switch v-model="formData.[[ c.field_name ]]" :active-value="1" :inactive-value="0" />
 {% elif c.form_type_name == "TEXT_AREA" %}          <el-input type="textarea" v-model="formData.[[ c.field_name ]]" placeholder="[[ c.field_comment ]]" />
-{% elif c.form_type_name == "DATE_TIME" %}          <el-date-picker v-model="formData.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm:ss" />
+{% elif c.form_type_name == "DATE_TIME" %}          <el-date-picker v-model="formData.[[ c.field_name ]]" type="datetime" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD HH:mm" />
 {% elif c.form_type_name == "DATE" %}          <el-date-picker class="!w-[240px]" v-model="formData.[[ c.field_name ]]" type="date" placeholder="[[ c.field_comment ]]" value-format="YYYY-MM-DD" />
 {% endif %}        </el-form-item>
 {% elif c.form_type_name == "HIDDEN" %}        <el-input type="hidden" v-model="formData.[[ c.field_name ]]" />
@@ -108,6 +117,7 @@ import { useFullscreen } from "@vueuse/core";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { FullScreen, Refresh } from "@element-plus/icons-vue";
 import { usePageTable, useTableSelection } from "@/composables";
+import { formatDateTime } from "@/utils/format";
 import [[ entity_name ]]API from "@/api/[[ module_name ]]/[[ entity_kebab ]]";
 
 defineOptions({ name: "[[ entity_name ]]", inheritAttrs: false });
@@ -116,7 +126,7 @@ const queryFormRef = ref();
 const dataFormRef = ref();
 const tableWrapperRef = ref(null);
 const { toggle: toggleFullscreen } = useFullscreen(tableWrapperRef);
-const initialFormData = reactive({});
+const initialFormData = reactive({ id: undefined });
 
 const { loading, list, total, params, fetchData, handleQuery, handleResetQuery } = usePageTable({
   initialParams: { pageNum: 1, pageSize: 10 },
@@ -127,7 +137,7 @@ const { loading, list, total, params, fetchData, handleQuery, handleResetQuery }
 const { selectedIds, hasSelection, handleSelectionChange } = useTableSelection();
 
 const dialog = reactive({ title: "", visible: false });
-const formData = reactive({});
+const formData = reactive({ id: undefined });
 
 const rules = reactive({
 {% for c in columns %}{% if c.is_show_in_form and c.is_required %}  [[ c.field_name ]]: [{ required: true, message: "请输入[[ c.field_comment ]]", trigger: "blur" }],

@@ -28,6 +28,7 @@ export type [[ entity_name ]]Detail = [[ entity_name ]]Item & [[ entity_name ]]F
 
 /** [[ business_name ]]列表项 */
 export interface [[ entity_name ]]Item {
+  id?: string | number;
 {% for c in columns %}{% if c.is_show_in_list %}{% if c.field_comment %}  /** [[ c.field_comment ]] */{% endif %}
 
   [[ c.field_name ]]?: [[ c.ts_type ]];

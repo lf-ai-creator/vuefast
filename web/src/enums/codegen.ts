@@ -10,16 +10,14 @@ import type { OptionItem } from "@/api/common";
  * 表单类型枚举
  */
 export const FormTypeEnum: Record<string, OptionItem> = {
-  INPUT: { value: 1, label: "输入框" },
-  SELECT: { value: 2, label: "下拉框" },
-  RADIO: { value: 3, label: "单选框" },
-  CHECK_BOX: { value: 4, label: "复选框" },
   INPUT_NUMBER: { value: 5, label: "数字输入框" },
-  SWITCH: { value: 6, label: "开关" },
-  TEXT_AREA: { value: 7, label: "文本域" },
-  DATE: { value: 8, label: "日期框" },
-  DATE_TIME: { value: 9, label: "日期时间框" },
-  HIDDEN: { value: 10, label: "隐藏域" },
+  INPUT: { value: 1, label: "文本" },
+  BOOLEAN_SELECT: { value: 11, label: "布尔下拉框" },
+  SELECT: { value: 2, label: "枚举下拉框" },
+  DICT_SELECT: { value: 13, label: "字典下拉" },
+  DATE: { value: 8, label: "日期选择" },
+  DATE_TIME: { value: 9, label: "时间选择" },
+  FILE_UPLOAD: { value: 14, label: "文件上传" },
 };
 
 /**

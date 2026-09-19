@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 class [[ entity_name ]]QueryParams(BaseModel):
     page_num: int = Field(default=1, ge=1, alias="pageNum")
     page_size: int = Field(default=10, ge=1, le=100, alias="pageSize")
-{% for c in columns %}{% if c.is_show_in_query %}    [[ c.field_name ]]: [[ c.py_type ]] | None = Field(default=None, alias="[[ c.field_name ]]")
+{% for c in columns %}{% if c.is_show_in_query %}{% if c.query_type_name == "BETWEEN" %}    [[ c.field_name ]]: list[ [[ c.py_type ]] ] | [[ c.py_type ]] | None = Field(default=None, alias="[[ c.field_name ]]")
+{% else %}    [[ c.field_name ]]: [[ c.py_type ]] | None = Field(default=None, alias="[[ c.field_name ]]")
+{% endif %}
 {% endif %}{% endfor %}
     model_config = {"populate_by_name": True}
 
@@ -28,6 +30,7 @@ class [[ entity_name ]]Update(BaseModel):
 
 
 class [[ entity_name ]]VO(BaseModel):
+    id: int
 {% for c in columns %}{% if not c.is_pk %}    [[ c.field_name ]]: [[ c.py_type ]]{% if c.is_nullable %} | None{% endif %} = Field(default={% if c.is_nullable %}None{% elif c.field_type == "str" %}""{% elif c.field_type == "int" %}0{% elif c.field_type == "bool" %}False{% else %}None{% endif %}, alias="[[ c.field_name ]]")
 {% endif %}{% endfor %}
     model_config = {"populate_by_name": True}

@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/[[ entity_kebab ]]", tags=["[[ business_name 
 async def get_page(
     page_num: int = Query(default=1, ge=1, alias="pageNum"),
     page_size: int = Query(default=10, ge=1, le=100, alias="pageSize"),
-{% for c in columns %}{% if c.is_show_in_query %}    [[ c.field_name ]]: str | None = Query(default=None, alias="[[ c.field_name ]]"),
+{% for c in columns %}{% if c.is_show_in_query %}    [[ c.field_name ]]: list[str] | str | None = Query(default=None, alias="[[ c.field_name ]]"),
 {% endif %}{% endfor %}    db: AsyncSession = Depends(get_db),
 ):
     query = [[ entity_name ]]QueryParams(
@@ -55,8 +55,9 @@ async def update(id: int, form: [[ entity_name ]]Update, db: AsyncSession = Depe
     return Result(data=None)
 
 
-@router.delete("/{ids}", summary="删除[[ business_name ]]",
+{% if delete_enabled %}@router.delete("/{ids}", summary="删除[[ business_name ]]",
                dependencies=[Depends(require_perm("[[ module_name ]]:[[ entity_kebab ]]:delete"))])
 async def delete(ids: str, db: AsyncSession = Depends(get_db)):
     count = await [[ entity_name ]]Service(db).delete(ids)
     return Result(data=count)
+{% endif %}

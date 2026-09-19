@@ -11,7 +11,7 @@ import type { TreeNode } from "../utils/tree-builder";
 
 export function useCodePreview(genConfigFormData: Ref<GenConfigForm>) {
   const treeData = ref<TreeNode[]>([]);
-  const previewScope = ref<"all" | "frontend" | "backend">("all");
+  const previewScope = ref<"all" | "frontend" | "backend" | "app">("all");
   const previewTypeOptions = ref<string[]>([]);
   const previewTypes = ref<string[]>([]);
 

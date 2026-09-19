@@ -1,8 +1,18 @@
 <template>
   <div class="page-container">
-    <TableList ref="tableListRef" @generate="handleOpenDrawer" @reset-config="handleResetConfig" />
+    <TableList
+      ref="tableListRef"
+      @configure="(tableName) => handleOpenDrawer(tableName, 'config')"
+      @preview="(tableName) => handleOpenDrawer(tableName, 'preview')"
+      @reset-config="handleResetConfig"
+    />
 
-    <GeneratorDrawer ref="drawerRef" v-model:visible="drawerVisible" :title="drawerTitle" />
+    <GeneratorDrawer
+      ref="drawerRef"
+      v-model:visible="drawerVisible"
+      :title="drawerTitle"
+      @success="tableListRef?.handleQuery()"
+    />
   </div>
 </template>
 
@@ -17,11 +27,11 @@ const drawerTitle = ref("");
 const drawerRef = ref();
 const tableListRef = ref();
 
-function handleOpenDrawer(tableName: string) {
-  drawerTitle.value = `${tableName} 代码生成`;
+function handleOpenDrawer(tableName: string, mode: "config" | "preview") {
+  drawerTitle.value = `${tableName} · ${mode === "config" ? "代码配置" : "代码预览"}`;
   drawerVisible.value = true;
   nextTick(() => {
-    drawerRef.value?.open(tableName);
+    drawerRef.value?.open(tableName, mode);
   });
 }
 

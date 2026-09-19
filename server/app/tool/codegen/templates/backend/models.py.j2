@@ -5,14 +5,14 @@
 {% endif %}{% if has_date %}from datetime import date
 {% endif %}{% if has_time %}from datetime import time
 {% endif %}
-from sqlalchemy import {% for imp in sa_imports %}{{ imp }}, {% endfor %}
+from sqlalchemy import {% for imp in sa_imports %}[[ imp ]]{% if not loop.last %}, {% endif %}{% endfor %}
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base, BaseIdMixin, TimestampMixin, SoftDeleteMixin
+from app.database import Base, BaseIdMixin, TimestampMixin{% if delete_mode == "logical" %}, SoftDeleteMixin{% endif %}
 
 
-class [[ entity_name ]](Base, BaseIdMixin, TimestampMixin, SoftDeleteMixin):
+class [[ entity_name ]](Base, BaseIdMixin, TimestampMixin{% if delete_mode == "logical" %}, SoftDeleteMixin{% endif %}):
     __tablename__ = "[[ table_name ]]"
 
-{% for c in columns %}{% if not c.is_pk %}    [[ c.field_name ]]: Mapped[{% if c.is_nullable %}{{ c.py_type }} | None{% else %}{{ c.py_type }}{% endif %}] = mapped_column({{ c.sa_column }}, comment="[[ c.field_comment ]]")
+{% for c in columns %}{% if not c.is_pk %}    [[ c.field_name ]]: Mapped[{% if c.is_nullable %}[[ c.py_type ]] | None{% else %}[[ c.py_type ]]{% endif %}] = mapped_column([[ c.sa_column ]]{% if c.field_name != c.column_name %}, name="[[ c.column_name ]]"{% endif %}, comment="[[ c.field_comment ]]")
 {% endif %}{% endfor %}

@@ -1,10 +1,10 @@
 <template>
-  <el-card class="page-search" shadow="never">
+  <el-card class="page-search codegen-search" shadow="never">
     <el-form ref="queryFormRef" :model="params" :inline="true">
       <el-form-item prop="keywords" label="关键字">
         <el-input
           v-model="params.keywords"
-          placeholder="表名"
+          placeholder="请输入表名"
           clearable
           @keyup.enter="handleQuery"
         />
@@ -22,7 +22,25 @@
     </el-form>
   </el-card>
 
-  <el-card class="page-content" shadow="never">
+  <el-card ref="tableWrapperRef" class="page-content codegen-table-card" shadow="never">
+    <div class="page-toolbar">
+      <div class="page-toolbar__left">
+        <span class="codegen-table-title">数据表</span>
+        <span class="codegen-table-meta">共 {{ total }} 张表</span>
+      </div>
+      <div class="page-toolbar__right">
+        <el-tooltip content="刷新" placement="top">
+          <el-button class="page-icon-btn" :loading="loading" @click="fetchData">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-tooltip content="全屏" placement="top">
+          <el-button class="page-icon-btn" @click="toggleFullscreen">
+            <el-icon><FullScreen /></el-icon>
+          </el-button>
+        </el-tooltip>
+      </div>
+    </div>
     <div class="page-table-wrapper">
       <el-table
         v-loading="loading"
@@ -32,27 +50,53 @@
         highlight-current-row
         border
       >
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="表名" prop="tableName" min-width="100" />
-        <el-table-column label="描述" prop="tableComment" width="150" />
-        <el-table-column label="存储引擎" align="center" prop="engine" />
-        <el-table-column label="排序规则" align="center" prop="tableCollation" />
+        <el-table-column type="index" label="序号" width="70" align="center" />
+        <el-table-column label="表名" prop="tableName" min-width="180" />
+        <el-table-column label="备注" prop="tableComment" min-width="260" show-overflow-tooltip />
         <el-table-column
-          label="创建时间"
+          label="代码配置时间"
           align="center"
-          prop="createTime"
+          prop="configTime"
+          width="180"
           :formatter="(row, column, cellValue) => formatDateTime(cellValue)"
         />
-        <el-table-column fixed="right" label="操作" width="200">
+        <el-table-column fixed="right" label="操作" width="300" align="center">
           <template #default="scope">
+            <el-tag
+              v-if="scope.row.isConfigured === TABLE_CONFIGURED"
+              size="small"
+              type="success"
+              effect="plain"
+              class="mr-2"
+            >
+              已配置
+            </el-tag>
             <el-button
               type="primary"
               size="small"
               link
-              @click="emit('generate', scope.row.tableName)"
+              @click="emit('configure', scope.row.tableName)"
             >
-              <template #icon><MagicStick /></template>
-              生成代码
+              <template #icon><Setting /></template>
+              代码配置
+            </el-button>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="emit('preview', scope.row.tableName)"
+            >
+              <template #icon><View /></template>
+              代码预览
+            </el-button>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="handleDownload(scope.row.tableName)"
+            >
+              <template #icon><Download /></template>
+              下载
             </el-button>
             <el-button
               v-if="scope.row.isConfigured === TABLE_CONFIGURED"
@@ -74,6 +118,7 @@
       v-model:total="total"
       v-model:page="params.pageNum"
       v-model:limit="params.pageSize"
+      class="page-pagination"
       @pagination="fetchData"
     />
   </el-card>
@@ -81,7 +126,16 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { MagicStick, Refresh, RefreshLeft, Search } from "@element-plus/icons-vue";
+import { useFullscreen } from "@vueuse/core";
+import {
+  Download,
+  FullScreen,
+  Refresh,
+  RefreshLeft,
+  Search,
+  Setting,
+  View,
+} from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox, type FormInstance } from "element-plus";
 
 import GeneratorAPI from "@/api/codegen";
@@ -93,11 +147,14 @@ import { formatDateTime } from "@/utils/format";
 const TABLE_CONFIGURED = 1;
 
 const emit = defineEmits<{
-  generate: [tableName: string];
+  configure: [tableName: string];
+  preview: [tableName: string];
   "reset-config": [tableName: string];
 }>();
 
 const queryFormRef = ref<FormInstance>();
+const tableWrapperRef = ref<HTMLElement | null>(null);
+const { toggle: toggleFullscreen } = useFullscreen(tableWrapperRef);
 
 // ── 分页表格状态 ────────────────────────────────────────────
 /** 分页表格数据管理 */
@@ -130,9 +187,53 @@ async function handleResetConfig(tableName: string): Promise<void> {
   handleQuery();
 }
 
+async function handleDownload(tableName: string): Promise<void> {
+  try {
+    await GeneratorAPI.download(tableName, "classic", "ts");
+    ElMessage.success("代码下载成功");
+  } catch {
+    ElMessage.error("代码下载失败，请先检查代码配置");
+  }
+}
+
 onMounted(() => {
   handleQuery();
 });
 
 defineExpose({ handleQuery, handleResetConfig });
 </script>
+
+<style scoped lang="scss">
+.codegen-search {
+  :deep(.el-form-item) {
+    margin-bottom: 0;
+  }
+}
+
+.codegen-table-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.codegen-table-meta {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .codegen-search {
+    :deep(.el-input) {
+      width: 100%;
+    }
+  }
+
+  :deep(.codegen-table-card .el-table) {
+    .el-table__cell:nth-child(4),
+    .el-table__cell:nth-child(5) {
+      display: none;
+    }
+  }
+}
+</style>

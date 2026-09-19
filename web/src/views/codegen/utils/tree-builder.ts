@@ -6,7 +6,7 @@ export interface TreeNode {
   key?: string;
   content?: string;
   children?: TreeNode[];
-  scope?: "frontend" | "backend";
+  scope?: "frontend" | "backend" | "app";
   language?: string;
 }
 
@@ -15,7 +15,7 @@ export interface TreeNode {
  * 将扁平的预览文件列表转为树形结构
  */
 export function buildFileTree(data: GeneratorPreviewItem[]): TreeNode {
-  const root: TreeNode = { label: "前后端代码", key: "root", children: [] };
+  const root: TreeNode = { label: "生成代码文件", key: "root", children: [] };
 
   data.forEach((item) => {
     const normalizedPath = item.path.replace(/\\/g, "/");
@@ -94,7 +94,7 @@ export function getFileIcon(node: TreeNode): string {
  */
 export function filterTree(
   nodes: TreeNode[],
-  scope: "all" | "frontend" | "backend",
+  scope: "all" | "frontend" | "backend" | "app",
   types: string[]
 ): TreeNode[] {
   const match = (node: TreeNode): boolean => {

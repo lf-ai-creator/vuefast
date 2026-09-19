@@ -9,12 +9,18 @@ export function useGenConfig() {
   const genConfigFormData = ref<GenConfigForm>({
     fieldConfigs: [],
     pageType: "classic",
+    formEnabled: 1,
+    formLayout: "dialog",
+    formWidth: "600px",
+    formColumns: 2,
+    deleteEnabled: 1,
+    deleteMode: "logical",
+    deleteType: "single_batch",
   });
 
   const genConfigFormRules = {
     tableName: [{ required: true, message: "请输入表名", trigger: "blur" }],
     businessName: [{ required: true, message: "请输入业务名", trigger: "blur" }],
-    packageName: [{ required: true, message: "请输入主包名", trigger: "blur" }],
     moduleName: [{ required: true, message: "请输入模块名", trigger: "blur" }],
     entityName: [{ required: true, message: "请输入实体名", trigger: "blur" }],
   };
@@ -79,10 +85,9 @@ export function useGenConfig() {
 
   /** 校验基础配置必填项 */
   function validateBasic(): boolean {
-    const { tableName, packageName, businessName, moduleName, entityName } =
-      genConfigFormData.value;
-    if (!tableName || !packageName || !businessName || !moduleName || !entityName) {
-      ElMessage.error("表名、业务名、包名、模块名、实体名不能为空");
+    const { tableName, businessName, moduleName, entityName } = genConfigFormData.value;
+    if (!tableName || !businessName || !moduleName || !entityName) {
+      ElMessage.error("表名、业务名、模块名、实体名不能为空");
       return false;
     }
     return true;

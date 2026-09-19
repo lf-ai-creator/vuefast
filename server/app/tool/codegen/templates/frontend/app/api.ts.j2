@@ -1,0 +1,46 @@
+import request from "@/utils/request";
+const BASE_URL = "/api/v1/[[ entity_kebab ]]";
+
+const [[ entity_name ]]API = {
+  getPage(queryParams?: [[ entity_name ]]PageQuery) {
+    return request<PageResult<[[ entity_name ]]Item>>({
+      url: BASE_URL,
+      method: "GET",
+      data: queryParams,
+    });
+  },
+  getFormData(id: number) {
+    return request<[[ entity_name ]]Form>({
+      url: `${BASE_URL}/${id}/form`,
+      method: "GET",
+    });
+  },
+  create(data: [[ entity_name ]]Form) {
+    return request({ url: BASE_URL, method: "POST", data });
+  },
+  update(id: number, data: [[ entity_name ]]Form) {
+    return request({ url: `${BASE_URL}/${id}`, method: "PUT", data });
+  },
+  deleteByIds(ids: string) {
+    return request({ url: `${BASE_URL}/${ids}`, method: "DELETE" });
+  },
+};
+
+export default [[ entity_name ]]API;
+
+export interface [[ entity_name ]]PageQuery {
+  pageNum?: number;
+  pageSize?: number;
+  keywords?: string;
+{% for c in columns %}{% if c.is_show_in_query %}  [[ c.field_name ]]?: [[ c.ts_type ]]{% if c.query_type_name == "BETWEEN" %}[]{% endif %};
+{% endif %}{% endfor %}}
+
+export interface [[ entity_name ]]Item {
+  id: number;
+{% for c in columns %}{% if c.is_show_in_list %}  [[ c.field_name ]]?: [[ c.ts_type ]];
+{% endif %}{% endfor %}}
+
+export interface [[ entity_name ]]Form {
+  id?: number;
+{% for c in columns %}{% if c.is_show_in_form %}  [[ c.field_name ]]?: [[ c.ts_type ]];
+{% endif %}{% endfor %}}

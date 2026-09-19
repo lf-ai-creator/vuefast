@@ -25,6 +25,10 @@
               <el-icon><Cpu /></el-icon>
               后端
             </el-radio-button>
+            <el-radio-button value="app">
+              <el-icon><Iphone /></el-icon>
+              App
+            </el-radio-button>
           </el-radio-group>
         </div>
         <el-divider direction="vertical" />
@@ -49,7 +53,13 @@
           <template #icon><CopyDocument /></template>
           复制代码
         </el-button>
-        <el-button size="small" type="success" plain @click="handleDownload">
+        <el-button
+          size="small"
+          type="success"
+          plain
+          :loading="downloadLoading"
+          @click="handleDownload"
+        >
           <template #icon><Download /></template>
           下载 ZIP
         </el-button>
@@ -86,11 +96,17 @@
                 <el-tag
                   v-if="data.scope"
                   size="small"
-                  :type="data.scope === 'frontend' ? 'success' : 'warning'"
+                  :type="
+                    data.scope === 'frontend'
+                      ? 'success'
+                      : data.scope === 'app'
+                        ? 'primary'
+                        : 'warning'
+                  "
                   effect="plain"
                   class="scope-tag"
                 >
-                  {{ data.scope === "frontend" ? "前端" : "后端" }}
+                  {{ data.scope === "frontend" ? "Web" : data.scope === "app" ? "App" : "后端" }}
                 </el-tag>
               </div>
             </template>
@@ -152,7 +168,7 @@ import { getFileIcon } from "../utils/tree-builder";
 
 const props = defineProps<{
   genConfigFormData: GenConfigForm;
-  previewScope: "all" | "frontend" | "backend";
+  previewScope: "all" | "frontend" | "backend" | "app";
   previewTypes: string[];
   previewTypeOptions: string[];
   filteredTreeData: any[];
@@ -162,7 +178,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (_e: "update:previewScope", _val: "all" | "frontend" | "backend"): void;
+  (_e: "update:previewScope", _val: "all" | "frontend" | "backend" | "app"): void;
   (_e: "update:previewTypes", _val: string[]): void;
   (_e: "file-click", _data: any): void;
   (_e: "copy"): void;
@@ -172,6 +188,7 @@ const cmRef = ref<CmComponentRef>();
 const cmOptions: EditorConfiguration = { mode: "text/javascript" };
 const fileTreeRef = ref();
 const fileTreeWidth = ref(280);
+const downloadLoading = ref(false);
 
 const currentFilePath = computed(() => {
   const key = props.currentFileKey;
@@ -181,7 +198,7 @@ const currentFilePath = computed(() => {
 });
 
 function onScopeChange(val: any) {
-  emit("update:previewScope", val as "all" | "frontend" | "backend");
+  emit("update:previewScope", val as "all" | "frontend" | "backend" | "app");
 }
 
 function onTypesChange(val: any) {
@@ -206,9 +223,17 @@ const fileCount = computed(() => {
   return count;
 });
 
-function handleDownload() {
+async function handleDownload() {
   const pageType = props.genConfigFormData.pageType || "classic";
-  GeneratorAPI.download(props.tableName, pageType as "classic" | "curd", "ts");
+  downloadLoading.value = true;
+  try {
+    await GeneratorAPI.download(props.tableName, pageType as "classic" | "curd", "ts");
+    ElMessage.success("代码下载成功");
+  } catch {
+    ElMessage.error("代码下载失败，请稍后重试");
+  } finally {
+    downloadLoading.value = false;
+  }
 }
 
 function refreshEditor() {
@@ -493,6 +518,34 @@ onBeforeUnmount(() => {
         .empty-text {
           font-size: 14px;
         }
+      }
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .preview-step {
+    .preview-toolbar {
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+      padding: 10px;
+
+      .toolbar-left,
+      .toolbar-right {
+        flex-wrap: wrap;
+      }
+
+      :deep(.el-divider--vertical) {
+        display: none;
+      }
+    }
+
+    .preview-container {
+      min-height: 560px;
+
+      .file-tree-panel {
+        min-width: 160px;
       }
     }
   }

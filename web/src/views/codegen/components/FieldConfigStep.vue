@@ -114,9 +114,7 @@
             <div class="field-info" style="flex-shrink: 0; width: 140px">
               <div class="flex items-center gap-2">
                 <span class="font-medium text-sm">{{ row.columnName }}</span>
-                <el-tag v-if="row.isPrimaryKey" size="small" type="warning" effect="dark">
-                  主键
-                </el-tag>
+                <el-tag v-if="row.is_pk" size="small" type="warning" effect="dark">主键</el-tag>
               </div>
               <div class="text-xs text-gray-400 font-mono mt-1">
                 {{ row.columnType }} → {{ row.fieldType }}
@@ -416,5 +414,34 @@ onBeforeUnmount(() => {
   background: var(--el-color-primary-light-9) !important;
   border: 1px dashed var(--el-color-primary);
   opacity: 0.5;
+}
+
+@media (max-width: 900px) {
+  .field-config-step {
+    padding: 0;
+
+    .stats-bar {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px;
+
+      .stat-item {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 130px;
+        padding: 0 8px;
+        border-right: 0;
+      }
+
+      .bulk-actions {
+        justify-content: flex-start;
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+
+    .field-table {
+      min-width: 900px;
+    }
+  }
 }
 </style>

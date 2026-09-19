@@ -1,0 +1,80 @@
+<template>
+  <view class="page-container">
+    <wd-search v-model="queryParams.keywords" placeholder="搜索[[ business_name ]]" hide-cancel @search="load" />
+    <view class="mt-16rpx">
+      <wd-card v-for="item in list" :key="item.id" @click="openForm(item.id)">
+{% for c in columns %}{% if c.is_show_in_list %}        <view class="flex-between mb-8rpx">
+          <text class="text-28rpx color-text-primary">[[ c.list_name or c.field_name ]]</text>
+          <text class="text-28rpx">{{ item.[[ c.field_name ]] ?? "-" }}</text>
+        </view>
+{% endif %}{% endfor %}        <view class="flex-end mt-8rpx">
+{% if delete_enabled and delete_type in ("single_batch", "single") %}          <wd-button size="small" type="error" plain @click.stop="remove(item.id)">删除</wd-button>
+{% endif %}
+        </view>
+      </wd-card>
+      <wd-loadmore v-if="loading" state="loading" />
+      <wd-empty v-else-if="!list.length" tip="暂无数据" />
+    </view>
+    <wd-popup v-model="dialog.visible" position="bottom" custom-class="popup-bottom">
+      <view class="p-4">
+        <view class="popup-title">{{ formData.id ? "编辑[[ business_name ]]" : "新增[[ business_name ]]" }}</view>
+        <wd-form :model="formData">
+{% for c in columns %}{% if c.is_show_in_form and c.form_type_name != "HIDDEN" %}        <wd-form-item title="[[ c.field_comment or c.field_name ]]" prop="[[ c.field_name ]]">
+          <wd-input v-model="formData.[[ c.field_name ]]" placeholder="请输入[[ c.field_comment or c.field_name ]]" />
+        </wd-form-item>
+{% endif %}{% endfor %}        </wd-form>
+        <view class="popup-actions">
+          <wd-button type="info" variant="plain" @click="dialog.visible = false">取消</wd-button>
+          <wd-button :loading="submitting" @click="submit">保存</wd-button>
+        </view>
+      </view>
+    </wd-popup>
+  </view>
+</template>
+
+<script lang="ts" setup>
+import { onLoad, onPullDownRefresh } from "@dcloudio/uni-app";
+import [[ entity_name ]]API, { type [[ entity_name ]]Form, type [[ entity_name ]]Item, type [[ entity_name ]]PageQuery } from "@/api/[[ entity_kebab ]]";
+
+definePage({ name: "[[ entity_kebab ]]", style: { navigationBarTitleText: "[[ business_name ]]" } });
+const list = ref<[[ entity_name ]]Item[]>([]);
+const loading = ref(false);
+const submitting = ref(false);
+const queryParams = reactive<[[ entity_name ]]PageQuery>({ pageNum: 1, pageSize: 10 });
+const dialog = reactive({ visible: false });
+const formData = reactive<[[ entity_name ]]Form>({});
+
+async function load() {
+  loading.value = true;
+  try {
+    const page = await [[ entity_name ]]API.getPage(queryParams);
+    list.value = page.list ?? [];
+  } finally {
+    loading.value = false;
+  }
+}
+async function openForm(id?: number) {
+  Object.keys(formData).forEach((key) => delete (formData as Record<string, unknown>)[key]);
+  if (id) Object.assign(formData, await [[ entity_name ]]API.getFormData(id));
+  dialog.visible = true;
+}
+async function submit() {
+  submitting.value = true;
+  try {
+    if (formData.id) await [[ entity_name ]]API.update(formData.id, formData);
+    else await [[ entity_name ]]API.create(formData);
+    dialog.visible = false;
+    await load();
+  } finally {
+    submitting.value = false;
+  }
+}
+async function remove(id: number) {
+  const result = await uni.showModal({ title: "提示", content: "确定删除这条数据吗？" });
+  if (!result.confirm) return;
+  await [[ entity_name ]]API.deleteByIds(String(id));
+  await load();
+}
+onLoad(load);
+onPullDownRefresh(async () => { await load(); uni.stopPullDownRefresh(); });
+</script>

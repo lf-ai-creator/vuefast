@@ -13,7 +13,7 @@ export interface GeneratorPreviewItem {
   /** 文件内容 */
   content: string;
   /** 文件范围(frontend/backend) */
-  scope: "frontend" | "backend";
+  scope: "frontend" | "backend" | "app";
   /** 文件语言(扩展名) */
   language: string;
 }
@@ -33,11 +33,13 @@ export interface TableItem {
   /** 是否已配置(1:是;0:否) */
   isConfigured?: number;
   /** 存储引擎 */
-  engine: string;
+  engine?: string;
   /** 字符集排序规则 */
-  tableCollation: string;
+  tableCollation?: string;
   /** 创建时间 */
-  createTime: string;
+  createTime?: string;
+  /** 最近代码配置时间 */
+  configTime?: string;
 }
 
 /** 代码生成配置表单 */
@@ -66,6 +68,20 @@ export interface GenConfigForm {
   fieldConfigs?: FieldConfig[];
   /** 页面类型 classic|curd */
   pageType?: "classic" | "curd";
+  /** 是否生成新增、修改表单 */
+  formEnabled?: number;
+  /** 表单承载方式 dialog|drawer */
+  formLayout?: "dialog" | "drawer";
+  /** 弹窗或抽屉宽度 */
+  formWidth?: string;
+  /** 表单每行字段数 */
+  formColumns?: number;
+  /** 是否允许生成删除功能 */
+  deleteEnabled?: number;
+  /** 删除方式 logical|physical */
+  deleteMode?: "logical" | "physical";
+  /** 删除类型 single_batch|single|batch */
+  deleteType?: "single_batch" | "single" | "batch";
   /** 要移除的表前缀，如 sys_ */
   removeTablePrefix?: string;
 }
@@ -78,16 +94,40 @@ export interface FieldConfig {
   columnName?: string;
   /** 列类型 */
   columnType?: string;
+  /** 数据库列描述（只读） */
+  columnComment?: string;
+  /** 是否允许为空 */
+  isNullable?: "YES" | "NO";
+  /** 是否主键 */
+  isPk?: boolean;
+  /** 数据库键类型 */
+  columnKey?: string;
   /** 字段名 */
   fieldName?: string;
   /** 字段类型 */
   fieldType?: string;
+  /** 前端 TypeScript 类型 */
+  frontendType?: string;
+  /** TypeScript 类型 */
+  tsType?: string;
   /** 字段描述 */
   fieldComment?: string;
+  /** 查询条件名称（独立于字段名词） */
+  queryName?: string;
+  /** 列表字段名称（独立于字段名词） */
+  listName?: string;
+  /** 列表列宽，留空时由组件自动计算 */
+  listWidth?: number;
+  /** 列表内容超长时自动省略 */
+  listEllipsis?: number;
   /** 是否在列表显示 */
   isShowInList?: number;
   /** 是否在表单显示 */
   isShowInForm?: number;
+  /** 是否新增显示 */
+  isShowInCreate?: number;
+  /** 是否更新显示 */
+  isShowInUpdate?: number;
   /** 是否在查询条件显示 */
   isShowInQuery?: number;
   /** 是否必填 */

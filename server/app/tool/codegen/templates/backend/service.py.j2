@@ -1,6 +1,6 @@
 """[[ entity_name ]] 服务 — 由代码生成器生成。"""
 
-from sqlalchemy import func, select, text, update as sa_update
+from sqlalchemy import {% if delete_mode == "physical" %}delete, {% endif %}func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessException
@@ -14,13 +14,26 @@ class [[ entity_name ]]Service:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_page(self, query: [[ entity_name ]]QueryParams) -> tuple[list[[[ entity_name ]]VO], int]:
+    async def get_page(self, query: [[ entity_name ]]QueryParams) -> tuple[list[ [[ entity_name ]]VO ], int]:
         conditions = []
-{% for c in columns %}{% if c.is_show_in_query and c.form_type_name == "INPUT" %}        if getattr(query, "[[ c.field_name ]]", None):
-            conditions.append([[ entity_name ]].[[ c.field_name ]].ilike(f"%{getattr(query, '[[ c.field_name ]]')}%"))
-{% elif c.is_show_in_query %}        if getattr(query, "[[ c.field_name ]]", None):
-            conditions.append([[ entity_name ]].[[ c.field_name ]] == getattr(query, "[[ c.field_name ]]"))
-{% endif %}{% endfor %}
+{% for c in columns %}{% if c.is_show_in_query %}        value = getattr(query, "[[ c.field_name ]]", None)
+        if value is not None and value != "":
+{% if c.query_type_name == "BETWEEN" %}            values = value if isinstance(value, list) else [value]
+            if len(values) >= 2 and values[0] not in (None, "") and values[1] not in (None, ""):
+                conditions.append([[ entity_name ]].[[ c.field_name ]].between(values[0], values[1]))
+{% elif c.query_type_name == "LIKE" %}            conditions.append([[ entity_name ]].[[ c.field_name ]].ilike(f"%{value}%"))
+{% elif c.query_type_name == "LIKE_LEFT" %}            conditions.append([[ entity_name ]].[[ c.field_name ]].ilike(f"%{value}"))
+{% elif c.query_type_name == "LIKE_RIGHT" %}            conditions.append([[ entity_name ]].[[ c.field_name ]].ilike(f"{value}%"))
+{% elif c.query_type_name == "IN" %}            values = value if isinstance(value, list) else [item.strip() for item in str(value).split(",") if item.strip()]
+            if values:
+                conditions.append([[ entity_name ]].[[ c.field_name ]].in_(values))
+{% elif c.query_type_name == "GT" %}            conditions.append([[ entity_name ]].[[ c.field_name ]] > value)
+{% elif c.query_type_name == "GE" %}            conditions.append([[ entity_name ]].[[ c.field_name ]] >= value)
+{% elif c.query_type_name == "LT" %}            conditions.append([[ entity_name ]].[[ c.field_name ]] < value)
+{% elif c.query_type_name == "LE" %}            conditions.append([[ entity_name ]].[[ c.field_name ]] <= value)
+{% elif c.query_type_name == "NE" %}            conditions.append([[ entity_name ]].[[ c.field_name ]] != value)
+{% else %}            conditions.append([[ entity_name ]].[[ c.field_name ]] == value)
+{% endif %}{% endif %}{% endfor %}
         base = select([[ entity_name ]]).where(*conditions)
 
         total_stmt = select(func.count()).select_from(base.subquery())
@@ -40,9 +53,9 @@ class [[ entity_name ]]Service:
         return self._to_vo(model)
 
     async def create(self, form: [[ entity_name ]]Create) -> None:
-        model = [[ entity_name ]](
-{% for c in columns %}{% if not c.is_pk and c.is_show_in_form %}            [[ c.field_name ]]=form.[[ c.field_name ]],
-{% endif %}{% endfor %}        )
+        model = [[ entity_name ]]({% for c in columns %}{% if not c.is_pk and c.is_show_in_form %}
+            [[ c.field_name ]]=form.[[ c.field_name ]],{% endif %}{% endfor %}
+        )
         self.db.add(model)
         await self.db.flush()
 
@@ -55,16 +68,23 @@ class [[ entity_name ]]Service:
             model.[[ c.field_name ]] = form.[[ c.field_name ]]
 {% endif %}{% endfor %}        await self.db.flush()
 
-    async def delete(self, ids: str) -> int:
+{% if delete_enabled %}    async def delete(self, ids: str) -> int:
         id_list = [int(x) for x in ids.split(",") if x.strip()]
         if not id_list:
             raise BusinessException(code=ResultCode.REQUEST_REQUIRED_PARAMETER_IS_EMPTY)
-        stmt = text(f"UPDATE {[[ entity_name ]].__tablename__} SET is_deleted=1 WHERE id = ANY(:ids)")
+{% if delete_mode == "physical" %}        stmt = delete([[ entity_name ]]).where([[ entity_name ]].id.in_(id_list))
+{% else %}        stmt = text(f"UPDATE {[[ entity_name ]].__tablename__} SET is_deleted=1 WHERE id = ANY(:ids)")
+{% endif %}
+{% if delete_mode == "physical" %}        result = await self.db.execute(stmt)
+{% else %}
         result = await self.db.execute(stmt, {"ids": id_list})
+{% endif %}
         return result.rowcount
+
+{% endif %}
 
     @staticmethod
     def _to_vo(model: [[ entity_name ]]) -> [[ entity_name ]]VO:
-        return [[ entity_name ]]VO(
-{% for c in columns %}{% if not c.is_pk %}            [[ c.field_name ]]=model.[[ c.field_name ]],
-{% endif %}{% endfor %}        )
+        return [[ entity_name ]]VO(id=model.id,{% for c in columns %}{% if not c.is_pk %}
+            [[ c.field_name ]]=model.[[ c.field_name ]],{% endif %}{% endfor %}
+        )

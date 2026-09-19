@@ -564,6 +564,13 @@ CREATE TABLE gen_table (
     parent_menu_id bigint,
     remove_table_prefix varchar(20),
     page_type varchar(20),
+    form_enabled smallint DEFAULT 1,
+    form_layout varchar(20) DEFAULT 'dialog',
+    form_width varchar(20) DEFAULT '600px',
+    form_columns smallint DEFAULT 2,
+    delete_enabled smallint DEFAULT 1,
+    delete_mode varchar(20) DEFAULT 'logical',
+    delete_type varchar(20) DEFAULT 'single_batch',
     create_time timestamp,
     update_time timestamp,
     is_deleted smallint DEFAULT 0,
@@ -579,6 +586,13 @@ COMMENT ON COLUMN gen_table.author IS '作者';
 COMMENT ON COLUMN gen_table.parent_menu_id IS '上级菜单ID，对应sys_menu的id ';
 COMMENT ON COLUMN gen_table.remove_table_prefix IS '要移除的表前缀，如: sys_';
 COMMENT ON COLUMN gen_table.page_type IS '页面类型(classic|curd)';
+COMMENT ON COLUMN gen_table.form_enabled IS '是否生成新增修改';
+COMMENT ON COLUMN gen_table.form_layout IS '表单布局';
+COMMENT ON COLUMN gen_table.form_width IS '表单宽度';
+COMMENT ON COLUMN gen_table.form_columns IS '表单每行列数';
+COMMENT ON COLUMN gen_table.delete_enabled IS '是否允许删除';
+COMMENT ON COLUMN gen_table.delete_mode IS '删除方式 logical/physical';
+COMMENT ON COLUMN gen_table.delete_type IS '删除类型 single_batch/single/batch';
 COMMENT ON COLUMN gen_table.create_time IS '创建时间';
 COMMENT ON COLUMN gen_table.update_time IS '更新时间';
 COMMENT ON COLUMN gen_table.is_deleted IS '是否删除';
@@ -596,12 +610,19 @@ CREATE TABLE gen_table_column (
     column_length int,
     field_name varchar(100) NOT NULL,
     field_type varchar(100),
+    frontend_type varchar(50),
     field_sort int,
     field_comment varchar(255),
+    query_name varchar(100),
+    list_name varchar(100),
+    list_width integer,
+    list_ellipsis smallint DEFAULT 1,
     max_length int,
     is_required smallint,
     is_show_in_list smallint DEFAULT 0,
     is_show_in_form smallint DEFAULT 0,
+    is_show_in_create smallint DEFAULT 0,
+    is_show_in_update smallint DEFAULT 0,
     is_show_in_query smallint DEFAULT 0,
     query_type smallint,
     form_type smallint,
@@ -614,11 +635,18 @@ COMMENT ON TABLE gen_table_column IS '代码生成字段配置表';
 COMMENT ON COLUMN gen_table_column.table_id IS '关联的表配置ID';
 COMMENT ON COLUMN gen_table_column.field_name IS '字段名称';
 COMMENT ON COLUMN gen_table_column.field_type IS '字段类型';
+COMMENT ON COLUMN gen_table_column.frontend_type IS '前端类型';
 COMMENT ON COLUMN gen_table_column.field_sort IS '字段排序';
 COMMENT ON COLUMN gen_table_column.field_comment IS '字段描述';
+COMMENT ON COLUMN gen_table_column.query_name IS '查询条件名称';
+COMMENT ON COLUMN gen_table_column.list_name IS '列表字段名称';
+COMMENT ON COLUMN gen_table_column.list_width IS '列表列宽';
+COMMENT ON COLUMN gen_table_column.list_ellipsis IS '列表自动省略';
 COMMENT ON COLUMN gen_table_column.is_required IS '是否必填';
 COMMENT ON COLUMN gen_table_column.is_show_in_list IS '是否在列表显示';
 COMMENT ON COLUMN gen_table_column.is_show_in_form IS '是否在表单显示';
+COMMENT ON COLUMN gen_table_column.is_show_in_create IS '是否新增显示';
+COMMENT ON COLUMN gen_table_column.is_show_in_update IS '是否更新显示';
 COMMENT ON COLUMN gen_table_column.is_show_in_query IS '是否在查询条件显示';
 COMMENT ON COLUMN gen_table_column.query_type IS '查询方式';
 COMMENT ON COLUMN gen_table_column.form_type IS '表单类型';
@@ -797,6 +825,3 @@ SELECT setval(pg_get_serial_sequence('sys_config', 'id'), COALESCE((SELECT MAX(i
 SELECT setval(pg_get_serial_sequence('sys_notice', 'id'), COALESCE((SELECT MAX(id) FROM sys_notice), 1));
 SELECT setval(pg_get_serial_sequence('sys_user_notice', 'id'), COALESCE((SELECT MAX(id) FROM sys_user_notice), 1));
 SELECT setval(pg_get_serial_sequence('sys_user_social', 'id'), COALESCE((SELECT MAX(id) FROM sys_user_social), 1));
-
-
-

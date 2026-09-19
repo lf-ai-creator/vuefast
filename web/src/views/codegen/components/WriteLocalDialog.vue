@@ -41,6 +41,26 @@
 
         <div class="dir-item">
           <div class="dir-label">
+            <el-tag size="small" type="primary" effect="light">App</el-tag>
+          </div>
+          <el-input
+            :model-value="appDirPath"
+            placeholder="点击右侧按钮选择 App 项目根目录"
+            readonly
+            class="dir-input"
+          >
+            <template #prefix>
+              <el-icon><Iphone /></el-icon>
+            </template>
+          </el-input>
+          <el-button :disabled="!supportsFSAccess" @click="emit('pickAppDir')">
+            <el-icon><FolderAdd /></el-icon>
+            选择
+          </el-button>
+        </div>
+
+        <div class="dir-item">
+          <div class="dir-label">
             <el-tag size="small" type="warning" effect="light">后端</el-tag>
           </div>
           <el-input
@@ -85,6 +105,10 @@
             <el-radio-button value="backend">
               <el-icon><Cpu /></el-icon>
               仅后端
+            </el-radio-button>
+            <el-radio-button value="app">
+              <el-icon><Iphone /></el-icon>
+              仅 App
             </el-radio-button>
           </el-radio-group>
         </div>
@@ -137,7 +161,8 @@ const props = defineProps<{
   supportsFSAccess: boolean;
   frontendDirPath: string;
   backendDirPath: string;
-  writeScope: "all" | "frontend" | "backend";
+  appDirPath: string;
+  writeScope: "all" | "frontend" | "backend" | "app";
   overwriteMode: "overwrite" | "skip" | "ifChanged";
   writeProgress: { total: number; done: number; percent: number; current: string };
   writeRunning: boolean;
@@ -145,22 +170,26 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "update:writeScope": [val: "all" | "frontend" | "backend"];
+  "update:writeScope": [val: "all" | "frontend" | "backend" | "app"];
   "update:overwriteMode": [val: "overwrite" | "skip" | "ifChanged"];
   pickFrontendDir: [];
   pickBackendDir: [];
+  pickAppDir: [];
   confirmWrite: [];
 }>();
 
 // 根据写入范围检查目录是否都选好了
 const dirReady = computed(() => {
   if (props.writeScope === "all") {
-    return !!props.frontendDirPath && !!props.backendDirPath;
+    return !!props.frontendDirPath && !!props.backendDirPath && !!props.appDirPath;
   }
   if (props.writeScope === "frontend") {
     return !!props.frontendDirPath;
   }
-  return !!props.backendDirPath;
+  if (props.writeScope === "backend") {
+    return !!props.backendDirPath;
+  }
+  return !!props.appDirPath;
 });
 </script>
 
